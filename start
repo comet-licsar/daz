@@ -1,0 +1,7 @@
+#!/bin/bash
+
+export MYPATH=/home/$USER
+export PATH="$MYPATH:$PATH"
+export PYTHONPATH="$MYPATH:$PYTHONPATH"
+
+exec "$@" 
