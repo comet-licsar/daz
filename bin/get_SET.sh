@@ -1,4 +1,3 @@
-
 #this is to be run in bash, takes long (last full processing took 2 days)
 
 # this is to get earth tides (bash):
