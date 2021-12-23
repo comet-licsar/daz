@@ -1,1 +1,2 @@
 iri2016
+git+https://github.com/hydrogeoscience/pygtide.git
