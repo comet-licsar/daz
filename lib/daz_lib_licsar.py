@@ -1,9 +1,14 @@
+#!/usr/bin/env python3
+
 import LiCSquery as lq
 import numpy as np
 from LiCSAR_lib.LiCSAR_misc import *
 import os
 import pandas as pd
 import framecare as fc
+
+# maybe not needed?
+from daz_lib import *
 
 def get_daz(frame):
     polyid=lq.get_frame_polyid(frame)[0][0]
@@ -13,6 +18,168 @@ def get_daz(frame):
 def get_azshift_SD(offile):
     azshift_SD = float(grep1line('azimuth_offset_polynomial', offile).split()[1])
     return azshift_SD
+
+#######################################
+# step 1 - export ESDs to a txt file:
+# see $LiCSAR_procdir/esds/esds.sh
+# or just get it from licsinfo's esd table..
+# (see LiCSquery - get_daz etc.)
+
+
+#######################################
+# step 2 - add additional information to the esds.txt and frames.txt files
+# to be run at JASMIN
+# this is to prepare the framespd and esds
+
+def s1_azfm(r, t0, azp):
+  """azfr = s1_azfm(r, t0, azp)
+  Calculate azimuth FM rate given slant range, reference slant-range delay and the azimuth FM rate polynomial for ScanSAR data
+  **Arguments:**
+  * r:    slant range (meters)
+  * t0:   reference slant range time for the polynomial (center swath delay in s)
+  * azp:  polynomial coefficients
+  **Output:**
+  * the function returns the azimuth FM rate"""
+  tsr = 2.0 * r / speed_of_light
+  dt = tsr - t0
+  azfr = azp[0] + dt * (azp[1] + dt*(azp[2] + dt*(azp[3] + dt*azp[4])))
+  return azfr
+
+
+def get_param_gamma(param, parfile, floatt = True, pos = 0):
+    a = grep1line(param,parfile).split()[1+pos]
+    if floatt:
+        a = float(a)
+    return a
+
+
+def generate_framespd(fname = 'esds2021_frames.txt', outcsv = 'framespd_2021.csv'):
+    ### fname is input file containing list of frames to generate the frames csv table
+    #in the form of:
+    # frame,master,center_lon,center_lat
+    a = pd.read_csv(fname)
+    a['heading']=0.00
+    a['azimuth_resolution']=0.00
+    a['avg_incidence_angle']=0.00
+    a['centre_range_m']=0.00
+    a['centre_time']=''
+    a['ka']=0.00
+    a['kr']=0.00
+    a['dfDC'] = 0.00
+    for i,row in a.iterrows():
+        frame=row['frame']
+        #print(frame)
+        tr = int(frame[:3])
+        metafile = os.path.join(os.environ['LiCSAR_public'], str(tr), frame, 'metadata', 'metadata.txt')
+        if not os.path.exists(metafile):
+            print('metadata file does not exist for frame '+frame)
+            continue
+        primepoch = grep1line('master=',metafile).split('=')[1]
+        path_to_slcdir = os.path.join(os.environ['LiCSAR_procdir'], str(tr), frame, 'SLC', primepoch)
+        if frame == '174A_05407_121212':
+            heading = -10.157417
+            azimuth_resolution = 13.968690
+            avg_incidence_angle = 39.5118
+            centre_range_m = 878941.4133
+            centre_time = '14:52:00'
+    #        kt = 
+        else:
+            try:
+                heading = float(grep1line('heading',metafile).split('=')[1])
+                azimuth_resolution = float(grep1line('azimuth_resolution',metafile).split('=')[1])
+                avg_incidence_angle = float(grep1line('avg_incidence_angle',metafile).split('=')[1])
+                centre_range_m = float(grep1line('centre_range_m',metafile).split('=')[1])
+                centre_time = grep1line('center_time',metafile).split('=')[1]
+            except:
+                print('some error occurred during frame '+frame)
+                azimuth_resolution = 0
+                avg_incidence_angle = 0
+                centre_range_m = 0
+                centre_time = 0
+                heading = 0
+    #        kt = float(grep1line('kt=',metafile).split('=')[1])
+        try:
+            dfDC, ka, kr = get_dfDC(path_to_slcdir)
+        except:
+            print('some error occurred during frame '+frame)
+            dfDC = 0
+            ka = 0
+            kr = 0
+        a.at[i,'heading'] = heading
+        a.at[i,'azimuth_resolution']  = azimuth_resolution
+        a.at[i,'avg_incidence_angle']  = avg_incidence_angle
+        a.at[i,'centre_range_m']  = centre_range_m
+        a.at[i,'centre_time']  = centre_time
+    #    a.at[i,'kt']  = kt
+        a.at[i,'dfDC']  = dfDC
+        a.at[i,'ka']  = ka
+        a.at[i,'kr']  = kr
+    a.to_csv(outcsv, float_format='%.4f', index=False)
+
+
+def get_dfDC(path_to_slcdir, f0=5405000500, burst_interval = 2.758277, returnka = True):
+    #f0 = get_param_gamma('radar_frequency', parfile)
+    #burst_interval = get_param_gamma('burst_interval', topsparfile)
+    parfile = glob.glob(path_to_slcdir+'/????????.slc.par')[0]
+    topsparfiles = glob.glob(path_to_slcdir+'/????????.IW?.slc.TOPS_par')
+    iwparfiles = glob.glob(path_to_slcdir+'/????????.IW?.slc.par')
+    #
+    lam = speed_of_light / f0
+    dfDC = []
+    kas = []
+    #krs = []
+    #print('This is a proper solution but applied to primary SLC image. originally it is applied by GAMMA on the RSLC...')
+    for n in range(len(topsparfiles)):
+        topsparfile = topsparfiles[n]
+        iwparfile = iwparfiles[n]
+        az_steering_rate = get_param_gamma('az_steering_rate', topsparfile) # az_steering_rate is the antenna beam steering rate
+        r1 = get_param_gamma('center_range_slc', iwparfile)
+        #get the satellite velocity
+        #midNstate = int(get_param_gamma('number_of_state_vectors', iwparfile)/2)+1
+        # ... actually number of burst info differs... so just using the 1st burst - as anyway we do quite drastic change to dfDC - mean from swaths
+        midNstate = 1
+        sv = 'state_vector_velocity_' + str(midNstate)
+        velc1 = get_param_gamma(sv, iwparfile, pos=0)
+        velc2 = get_param_gamma(sv, iwparfile, pos=1)
+        velc3 = get_param_gamma(sv, iwparfile, pos=2)
+        vsat = np.sqrt(velc1**2 + velc2**2 + velc3**2)
+        # now some calculations
+        afmrate_srdelay = get_param_gamma('az_fmrate_srdelay_'+ str(midNstate), topsparfile)
+        afmrate_poly = []
+        afmrate_poly.append(get_param_gamma('az_fmrate_polynomial_' + str(midNstate), topsparfile, pos = 0))
+        afmrate_poly.append(get_param_gamma('az_fmrate_polynomial_' + str(midNstate), topsparfile, pos = 1))
+        afmrate_poly.append(get_param_gamma('az_fmrate_polynomial_' + str(midNstate), topsparfile, pos = 2))
+        try:
+            afmrate_poly.append(get_param_gamma('az_fmrate_polynomial_' + str(midNstate), topsparfile, pos = 3))
+        except:
+            afmrate_poly.append(0)
+        try:
+            afmrate_poly.append(get_param_gamma('az_fmrate_polynomial_' + str(midNstate), topsparfile, pos = 4))
+        except:
+            afmrate_poly.append(0)
+        ka = s1_azfm(r1, afmrate_srdelay, afmrate_poly) #unit: Hz/s == 1/s^2
+        kr = -2.0 * vsat * az_steering_rate*(pi / 180.0) / lam
+        if (kr != 0.0):
+            #kt = ka * kr/(kr - ka)
+            # but maybe should be kt = (kr*ka)/(ka-kr) # see https://iopscience.iop.org/article/10.1088/1755-1315/57/1/012019/pdf  --- and remotesensing-12-01189-v2, and Fattahi et al...
+            # ok, gamma reads kr to be ka... corrected
+            kt = kr * ka/(ka - kr)
+        else:
+            kt = -ka
+        #finally calculate dfDC:
+        #burst_interval = get_param_gamma('burst_interval', topsparfile)
+        kas.append(ka)
+        #krs.append(kr)
+        dfDC.append(kt*burst_interval) #burst_interval is time within the burst... we can also just calculate.. see Grandin: eq 15: hal.archives-ouvertes.fr/hal-01621519/document
+        #ok, that's the thing - burst_interval is actually t(n+1) - t(n) - see remotesensing-12-01189-v2
+        #so it should be kt * -burst_interval, that is why GAMMA has the -kt J ... ok, good to realise this
+    dfDC = np.mean(dfDC)
+    ka = np.mean(kas)
+    #kr = np.mean(krs)
+    if returnka:
+        return dfDC, ka #, kr
+    else:
+        return dfDC
 
 
 # to include rdc_trans results (e.g. 099A comparison figure in the article):
