@@ -1,0 +1,25 @@
+name: daz
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.6
+  - pandas
+  - numpy
+  - scipy
+  - scikit-learn
+  - glob
+  - os
+  - subprocess
+  - lxml
+  - nvector
+  - pyproj
+  - requests
+  - urllib
+  - geopandas
+  - shapely
+  - hvplot
+  - holoviews
+  - simplekml
+  - matplotlib
+  - pygmt
