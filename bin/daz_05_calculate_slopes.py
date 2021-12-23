@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from daz_lib import *
+from daz_timeseries import *
 
 
 # step 6+ -- correct for daz_ARP=-39 mm
