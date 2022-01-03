@@ -1,9 +1,32 @@
-#this is to be run in bash, takes long (last full processing took 2 days)
-
+#!/bin/bash
+# 2021-06-24
+# M Lazecky 2020, 2021
 # this is to get earth tides (bash):
-in_esds=esds2021_take4.txt
-in_frames=framespd_2021.csv
-out_SET=earthtides_take4.csv
+# NOTE: takes long (last full processing took 2 days)
+
+if [ -z $3 ]; then
+ echo "Usage: in_esds in_frames out_SET"
+ echo "e.g.: esds.txt frames.csv tides.csv"
+ exit
+fi
+
+
+#in_esds=esds2021_take4.txt
+#in_frames=framespd_2021.csv
+#out_SET=earthtides_take4.csv
+
+in_esds=$1
+in_frames=$2
+out_SET=$3
+
+if [ ! -f $in_esds ] || [ ! -f $in_frames ] || [ -f $out_SET ]; then
+  echo "ERROR. Please check if following files exist:"
+  echo "in_esds: "$in_esds
+  echo "in_frames: "$in_frames
+  echo "note this file must NOT exist:"
+  echo "out_SET: "$out_SET
+  exit
+fi
 
 echo "frame, epoch, dEtide, dNtide, dUtide" > $out_SET
 for aline in `cat $in_frames | tail -n+2 `; do

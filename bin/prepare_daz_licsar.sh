@@ -15,14 +15,29 @@
 # it is ok to have it just:
 # frame,esd_master,epoch,daz_total_wrt_orbits,daz_cc_wrt_orbits
 
-outesd=$LiCSAR_procdir/esds2021_take4_$1.txt
-outfr=$LiCSAR_procdir/esds2021_frames_take_4_$1.txt
-outdif=$LiCSAR_procdir/esds2021_diff_in_frames_take_4_$1.txt
+if [ -z $3 ]; then 
+  echo "Please provide parameters: ID relorb_from relorb_to"; 
+  echo "e.g. prepare_daz_licsar.sh 2021_all 1 175"
+  exit;
+fi
+
+outesd=$LiCSAR_procdir/esds_$1.txt
+outfr=$LiCSAR_procdir/esds_frames_$1.txt
+
+
+#extra file, not used further for daz analysis:
+outdif=$LiCSAR_procdir/esds_diff_in_frames_$1.txt
+
+
+
 
 echo '' > $outdif
 echo "frame,esd_master,epoch,daz_total_wrt_orbits,daz_cc_wrt_orbits,orbits_precision,version" > $outesd
 echo "frame,master,center_lon,center_lat" > $outfr
+
+# to run for a subset of tracks (used for parallel extraction)
 for tr in `seq $2 $3`; do
+#for tr in `seq 1 175`; do
 for f in `ls $tr`; do
 echo $f
 m=`ls $tr/$f/SLC | head -n1`
@@ -90,7 +105,6 @@ fi
 
 
 if [ ! -z $esdtz ]; then
- #echo $f","$m","$SM","$s","$esdtz","$cc","$orb","$ver >> $outf
  echo $f","$SM","$s","$esdtz","$cc","$orb","$ver >> $outesd
 fi
 fi

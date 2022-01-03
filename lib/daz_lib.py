@@ -94,20 +94,27 @@ def get_tide_in_azimuth(lat, lon, hei, azi, time1):
 def merge_tides(esds, framespd, earthtides):
     #calculate daz_tide from N,E
     esds['daz_tide_mm'] = 0.0
-    for frame in framespd['frame']:
-        print(frame)
-        frameta = framespd[framespd['frame'] == frame]
-        tiderows_frame = earthtides[earthtides['frame'] == frame]
-        for i,row in esds[esds['frame'] == frame].iterrows():
-            tiderow = tiderows_frame[tiderows_frame[' epoch'] == row['epoch']]
-            if tiderow.empty:
-                print('error - no epoch in tides')
-                continue
-            E = tiderow[' dEtide'].values[0]
-            N = tiderow[' dNtide'].values[0]
-            heading = frameta['heading']
-            daz_tide_mm = EN2azi(N, E, heading)*1000
-            esds.at[i,'daz_tide_mm'] = daz_tide_mm
+    lenframes = len(framespd['frame'])
+    # oh.. would be better using framespd.iterrows but ok..
+    for i, frame in framespd['frame'].iteritems():
+        print('  Running for {0:6}/{1:6}th frame...'.format(i+1, lenframes), flush=True, end='\r')
+        #print(frame)
+        try:
+            frameta = framespd[framespd['frame'] == frame]
+            tiderows_frame = earthtides[earthtides['frame'] == frame]
+            for i,row in esds[esds['frame'] == frame].iterrows():
+                tiderow = tiderows_frame[tiderows_frame[' epoch'] == row['epoch']]
+                if tiderow.empty:
+                    print('error in frame '+frame+'- no epoch in tides')
+                    continue
+                E = tiderow[' dEtide'].values[0]
+                N = tiderow[' dNtide'].values[0]
+                heading = frameta['heading']
+                daz_tide_mm = EN2azi(N, E, heading)*1000
+                esds.at[i,'daz_tide_mm'] = daz_tide_mm
+        except:
+            print('some error for frame '+frame)
+    print('\ndone')
     return esds
 
 
