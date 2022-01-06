@@ -1,42 +1,104 @@
 #!/usr/bin/env python3
+"""
+v1.0 2022-01-03 Milan Lazecky, Leeds Uni
 
+This script will extract ionosphere shifts using IRI2016 model.
+
+===============
+Input & output files
+===============
+Inputs :
+ - frames.csv - contains data with heading:
+frame,master,center_lon,center_lat,heading,azimuth_resolution,avg_incidence_angle,centre_range_m,centre_time,dfDC
+ - esds.csv - contains data with heading:
+,frame,orbits_precision,daz_tide_mm,epochdate,daz_mm,years_since_beginning,daz_mm_notide
+
+Outputs :
+ - esds_with_iono.csv - added iono columns
+ - frames_with_iono.csv - added iono columns
+
+=====
+Usage
+=====
+daz_03_extract_iono.py [--indaz esds.csv] [--infra frames.csv] [--outfra frames_with_iono.csv] [--outdaz esds_with_iono.csv]
+
+
+"""
+#%% Change log
+'''
+v1.0 2022-01-03 Milan Lazecky, Uni of Leeds
+ - Original implementation - based on codes from 2021-06-24
+'''
 from daz_lib import *
 from daz_iono import *
 
-# get daz iono
-################### IONOSPHERE 
+import getopt, os, sys
+
+class Usage(Exception):
+    """Usage context manager"""
+    def __init__(self, msg):
+        self.msg = msg
 
 
-# estimating the ionosphere - takes long (several hours)
-esds['daz_iono_grad_mm'] = 0.0
-esds['daz_mm_notide_noiono_grad'] = 0.0
-framespd['Hiono'] = 0.0
-framespd['Hiono_std'] = 0.0
-framespd['Hiono_range'] = 0.0
-framespd['tecs_A'] = 0.0
-framespd['tecs_B'] = 0.0
-for frame in framespd['frame']:
-    print(frame)
-    resolution = framespd[framespd['frame'] == frame]['azimuth_resolution'].values[0] # in metres
+#%% Main
+def main(argv=None):
+    
+    #%% Check argv
+    if argv == None:
+        argv = sys.argv
+    
+    #%% Set default
+    indazfile = 'esds.csv'
+    inframesfile = 'frames.csv'
+    outdazfile = 'esds_with_iono.csv'
+    outframesfile = 'frames_with_iono.csv'
+    
+    #%% Read options
     try:
-        #daz_iono_with_F2 = calculate_daz_iono(frame, esds, framespd)
-        daz_iono_grad, hionos, tecs_A_master, tecs_B_master = calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = True, out_tec_master = True)
-        hiono = np.mean(hionos)
-        hiono_std = np.std(hionos)
-    except:
-        print('some error occurred here')
-        continue
-    esds.at[esds[esds['frame']==frame].index, 'daz_iono_grad_mm'] = daz_iono_grad*resolution*1000
-    #esds.at[esds[esds['frame']==frame].index, 'daz_iono_with_F2'] = daz_iono_with_F2
-    esds.at[esds[esds['frame']==frame].index, 'daz_mm_notide_noiono_grad'] = esds[esds['frame']==frame]['daz_mm_notide'] - esds[esds['frame']==frame]['daz_iono_grad_mm'] #*resolution*1000
-    framespd.at[framespd[framespd['frame']==frame].index, 'Hiono'] = hiono
-    framespd.at[framespd[framespd['frame']==frame].index, 'Hiono_std'] = hiono_std
-    framespd.at[framespd[framespd['frame']==frame].index, 'Hiono_range'] = max(hionos)-min(hionos)
-    framespd.at[framespd[framespd['frame']==frame].index, 'tecs_A'] = tecs_A_master
-    framespd.at[framespd[framespd['frame']==frame].index, 'tecs_B'] = tecs_B_master
-    #esds.at[esds[esds['frame']==frame].index, 'daz_mm_notide_noiono_F2'] = esds[esds['frame']==frame]['daz_mm_notide'] - esds['daz_iono_with_F2']*resolution*1000
+        try:
+            opts, args = getopt.getopt(argv[1:], "h", ["help", "indaz", "infra", "outdaz", "outfra"])
+        except getopt.error as msg:
+            raise Usage(msg)
+        for o, a in opts:
+            if o == '-h' or o == '--help':
+                print(__doc__)
+                return 0
+            elif o == "--indaz":
+                indazfile = a
+            elif o == "--infra":
+                inframesfile = a
+            elif o == "--outdaz":
+                outdazfile = a
+            elif o == "--outfra":
+                outframesfile = a
+        
+        if os.path.exists(outdazfile):
+            raise Usage('output esds csv file already exists. Cancelling')
+        if os.path.exists(outframesfile):
+            raise Usage('output frames csv file already exists. Cancelling')
+        if not os.path.exists(inframesfile):
+            raise Usage('input frames csv file does not exist. Cancelling')
+        if not os.path.exists(indazfile):
+            raise Usage('input esds csv file does not exist. Cancelling')
+            
+    except Usage as err:
+        print("\nERROR:",)
+        print("  "+str(err.msg))
+        print("\nFor help, use -h or --help.\n")
+        return 2
+    
+    # processing itself:
+    #esds = pd.read_csv(indazfile)
+    #framespd = pd.read_csv(inframesfile)
+    esds, framespd = load_csvs(esdscsv = indazfile, framescsv = inframesfile)
+    print('performing the iono calculation')
+    esds, framespd = extract_iono_full(esds, framespd)
+    print('saving files')
+    esds.to_csv(outdazfile)
+    framespd.to_csv(outframesfile)
+    print('done')
 
+#%% main
+if __name__ == "__main__":
+    sys.exit(main())
 
-# to back up before continuing:
-framespd.to_csv('backup_0921_framespd_iono_check.csv')
-esds.to_csv('backup_0921_esds_iono_check.csv')

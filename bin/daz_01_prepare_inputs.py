@@ -59,7 +59,7 @@ def main(argv=None):
     #indazfile = 'esds.txt'
     inframesfile = 'frames.txt'
     #outdazfile = 'esds.csv'
-    outframesfile = 'framespd.csv'
+    outframesfile = 'frames.csv'
     
     #%% Read options
     try:

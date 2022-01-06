@@ -1,39 +1,123 @@
 #!/usr/bin/env python3
+"""
+v1.0 2022-01-03 Milan Lazecky, Leeds Uni
 
+This script will estimate velocities from daz values.
+
+===============
+Input & output files
+===============
+Inputs :
+ - frames.csv - should have ITRF and iono corr.
+ - esds.csv - should have iono corr.
+
+Outputs :
+ - esds_final.csv
+ - frames_final.csv
+
+=====
+Usage
+=====
+daz_05_calculate_slopes.py [--indaz esds_with_iono.csv] [--infra frames_with_itrf.csv] [--outfra frames_final.csv] [--outdaz esds_final.csv]
+
+"""
+#%% Change log
+'''
+v1.0 2022-01-03 Milan Lazecky, Uni of Leeds
+ - Original implementation - based on codes from 2021-06-24
+'''
 from daz_lib import *
 from daz_timeseries import *
 
 
-# step 6+ -- correct for daz_ARP=-39 mm
-#################
-cols = ['daz_mm','daz_mm_notide', 'daz_mm_notide_noiono_grad']
-ep = esds[esds.epochdate > pd.Timestamp('2020-07-30')][cols]
-esds.update(ep.subtract(-39))
+import getopt, os, sys
+
+class Usage(Exception):
+    """Usage context manager"""
+    def __init__(self, msg):
+        self.msg = msg
+
+
+#%% Main
+def main(argv=None):
+    
+    #%% Check argv
+    if argv == None:
+        argv = sys.argv
+    
+    #%% Set default
+    indazfile = 'esds_with_iono.csv'
+    inframesfile = 'frames_with_itrf.csv'
+    outdazfile = 'esds_final.csv'
+    outframesfile = 'frames_final.csv'
+    # for skipping roll assistance - as e.g. Turkey is not correct in ITR2014 PMM
+    roll_assist = True
+    
+    #%% Read options
+    try:
+        try:
+            opts, args = getopt.getopt(argv[1:], "h", ["help", "indaz", "infra", "outdaz", "outfra"])
+        except getopt.error as msg:
+            raise Usage(msg)
+        for o, a in opts:
+            if o == '-h' or o == '--help':
+                print(__doc__)
+                return 0
+            elif o == "--indaz":
+                indazfile = a
+            elif o == "--infra":
+                inframesfile = a
+            elif o == "--outdaz":
+                outdazfile = a
+            elif o == "--outfra":
+                outframesfile = a
+        
+        if os.path.exists(outdazfile):
+            raise Usage('output esds csv file already exists. Cancelling')
+        if os.path.exists(outframesfile):
+            raise Usage('output frames csv file already exists. Cancelling')
+        if not os.path.exists(inframesfile):
+            raise Usage('input frames csv file does not exist. Cancelling')
+        if not os.path.exists(indazfile):
+            raise Usage('input esds csv file does not exist. Cancelling')
+            
+    except Usage as err:
+        print("\nERROR:",)
+        print("  "+str(err.msg))
+        print("\nFor help, use -h or --help.\n")
+        return 2
+    
+    # processing itself:
+    #esds = pd.read_csv(indazfile)
+    #framespd = pd.read_csv(inframesfile)
+    esds, framespd = load_csvs(esdscsv = indazfile, framescsv = inframesfile)
+    
+    # step 6+ -- correct for daz_ARP=-39 mm
+    #################
+    cols = ['daz_mm','daz_mm_notide', 'daz_mm_notide_noiono_grad']
+    ep = esds[esds.epochdate > pd.Timestamp('2020-07-30')][cols]
+    esds.update(ep.subtract(-39))
+    
+    
+    # 2021-10-12: the original way:
+    for col in ['daz_mm', 'daz_mm_notide', 'daz_mm_notide_noiono_grad']:
+        print('estimating velocities of '+col)
+        esds, framespd = df_calculate_slopes(esds, framespd, alpha = 1, eps = 1.35, bycol = col, subset = False, roll_assist = roll_assist)
+    #esds, framespd = df_calculate_slopes(esds, framespd, alpha = 1, eps = 1.35, bycol = 'daz_mm_notide_noiono_F2')
+    # to back up before continuing:
+    print('saving datasets')
+    framespd.to_csv(outframesfile)
+    esds.to_csv(outdazfile)
+    print('done')
+
+#%% main
+if __name__ == "__main__":
+    sys.exit(main())
 
 
 
 
 
-# 2021-10-12: the original way, only this time with full dataset:
-esds, framespd = df_calculate_slopes(esds, framespd, alpha = 1, eps = 1.35, bycol = 'daz_mm', subset = False, roll_assist = True)
-esds, framespd = df_calculate_slopes(esds, framespd, alpha = 1, eps = 1.35, bycol = 'daz_mm_notide', subset = False, roll_assist = True)
-esds, framespd = df_calculate_slopes(esds, framespd, alpha = 1, eps = 1.35, bycol = 'daz_mm_notide_noiono_grad', subset = False, roll_assist = True)
-#esds, framespd = df_calculate_slopes(esds, framespd, alpha = 1, eps = 1.35, bycol = 'daz_mm_notide_noiono_F2')
 
-# to back up before continuing:
-framespd.to_csv('backup_1012_framespd_iono_full_with_slopes_nosubset_roll.csv')
-esds.to_csv('backup_1012_esds_iono_full_with_slopes_nosubset_roll.csv')
 
-esds_roll = esds.copy(deep=True)
-framespd_roll = framespd.copy(deep=True)
-
-# skipping roll assistance - as e.g. Turkey is not correct in ITR2014 PMM
-esds, framespd = df_calculate_slopes(esds, framespd, alpha = 1, eps = 1.35, bycol = 'daz_mm', subset = False, roll_assist = False)
-esds, framespd = df_calculate_slopes(esds, framespd, alpha = 1, eps = 1.35, bycol = 'daz_mm_notide', subset = False, roll_assist = False)
-esds, framespd = df_calculate_slopes(esds, framespd, alpha = 1, eps = 1.35, bycol = 'daz_mm_notide_noiono_grad', subset = False,roll_assist = False)
-#esds, framespd = df_calculate_slopes(esds, framespd, alpha = 1, eps = 1.35, bycol = 'daz_mm_notide_noiono_F2')
-
-# to back up before continuing:
-framespd.to_csv('backup_1012_framespd_iono_full_with_slopes_nosubset_noroll.csv')
-esds.to_csv('backup_1012_esds_iono_full_with_slopes_nosubset_noroll.csv')
 
