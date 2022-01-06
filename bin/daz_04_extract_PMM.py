@@ -49,7 +49,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "h", ["help", "infra", "outfra"])
+            opts, args = getopt.getopt(argv[1:], "h", ["help", "infra =", "outfra ="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:

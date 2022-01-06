@@ -56,7 +56,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "h", ["help", "indaz", "infra", "outdaz", "outfra"])
+            opts, args = getopt.getopt(argv[1:], "h", ["help", "indaz =", "infra =", "outdaz =", "outfra ="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -91,6 +91,8 @@ def main(argv=None):
     #esds = pd.read_csv(indazfile)
     #framespd = pd.read_csv(inframesfile)
     esds, framespd = load_csvs(esdscsv = indazfile, framescsv = inframesfile)
+    print('extra data cleaning step - perhaps should add to another step (first?)')
+    esds, framespd = df_preprepare_esds(esds, framespd, firstdate = '', countlimit = 25)
     print('performing the iono calculation')
     esds, framespd = extract_iono_full(esds, framespd)
     print('saving files')

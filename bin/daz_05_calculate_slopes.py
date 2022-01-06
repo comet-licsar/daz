@@ -56,7 +56,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "h", ["help", "indaz", "infra", "outdaz", "outfra"])
+            opts, args = getopt.getopt(argv[1:], "h", ["help", "indaz =", "infra =", "outdaz =", "outfra ="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
