@@ -35,3 +35,5 @@ Script to export time series plots of daz values to KMZ file.
 For figures of decomposed data etc. see the daz_plotting library.
 
 
+for binder see:
+https://mybinder.org/v2/gl/comet_licsar%2Fdaz/HEAD
