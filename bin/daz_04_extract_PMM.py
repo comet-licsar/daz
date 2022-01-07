@@ -64,7 +64,7 @@ def main(argv=None):
         if os.path.exists(outframesfile):
             raise Usage('output frames csv file already exists. Cancelling')
         if not os.path.exists(inframesfile):
-            raise Usage('input frames csv file does not exist. Cancelling'))
+            raise Usage('input frames csv file does not exist. Cancelling')
             
     except Usage as err:
         print("\nERROR:",)
