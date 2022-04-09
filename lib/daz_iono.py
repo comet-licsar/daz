@@ -162,7 +162,7 @@ def get_abs_iono_corr(frame,esds,framespd):
     selected_frame_esds['TECS'] = (selected_frame_esds['tecs_A'] + selected_frame_esds['tecs_B'])/2
     master_tecs = ((frameta['tecs_A'] + frameta['tecs_B'])/2).values[0]
     dTEC = selected_frame_esds['TECS'] - master_tecs
-    pha_iono = -4*np.pi*k/c/f0*dTEC  # i expect faster propagation through plasma. but it may be opposite
+    pha_iono = 4*np.pi*k/c/f0*dTEC  # i expect faster propagation through plasma. but it may be opposite, not tested, just fast written
     daz_iono = razi*PRF/2/np.pi/f0 * pha_iono
     daz_iono_ifslowed = -daz_iono
     #tecovl = (TECs_B1 - TEC_master_B1)/(fH*fH) - (TECs_B2 - TEC_master_B2)/(fL*fL)
@@ -279,8 +279,11 @@ def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = Fal
     #daz_iono = -2*PRF*k*f0/c/dfDC * tecovl
     if method == 'gomba':
         # 08/2021 - empirically checked, correct:
-        tecovl = (selected_frame_esds['TECS_B'] - tec_B_master)/(fL*fL) - (selected_frame_esds['TECS_A'] - tec_A_master)/(fH*fH)
-        daz_iono = 2*PRF*k*f0/c/dfDC * tecovl
+        #tecovl = (selected_frame_esds['TECS_B'] - tec_B_master)/(fL*fL) - (selected_frame_esds['TECS_A'] - tec_A_master)/(fH*fH)
+        #daz_iono = 2*PRF*k*f0/c/dfDC * tecovl
+        # 04/2022 - actually the squares seem not needed, based directly on iono2phase (see article):
+        tecovl = (selected_frame_esds['TECS_B'] - tec_B_master)/fL - (selected_frame_esds['TECS_A'] - tec_A_master)/fH
+        daz_iono = 2*PRF*k/c/dfDC * tecovl
     else:
         # following the Liang 2019:
         # needs ka...
