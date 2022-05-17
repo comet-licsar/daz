@@ -415,3 +415,53 @@ def decompose_framespd(framespd, cell_size = 2.25, crs = "EPSG:4326"):
     
     return gridagg
 
+
+
+# following functions are to get pod offset - Section 5 of the article:
+
+import pandas as pd
+import os
+
+def get_pod_offset(dazes, years, thresyears = 4, minsamples = 15):
+    r2 = np.ones_like(years)
+    r3 = np.ones_like(years)
+    r2[years >= thresyears] = 0
+    r3[years < thresyears] = 0
+
+    # if too small dataset, cancelling
+    if np.sum(r3) < minsamples or np.sum(r2) < minsamples:
+        return np.nan
+    
+    # stack them to get A
+    A = np.vstack((years,r2,r3)).T
+    model = np.linalg.lstsq(A,dazes, rcond=False)[0]
+    offset = model[2] - model[1]
+    return offset
+
+'''
+# used as:
+esds = pd.read_csv('esds_updated_iono_ok_20220324.csv')
+esds['epochdate'] = esds.apply(lambda x : pd.to_datetime(str(x.epoch)).date(), axis=1)
+
+firstdatei = pd.Timestamp('2016-07-30')
+poddate = pd.Timestamp('2020-07-30')
+thresyears = aaa.days / 365.25
+
+esds['years_since_beginning'] = esds['epochdate'] - firstdatei.date()
+esds['years_since_beginning'] = esds['years_since_beginning'].apply(lambda x: float(x.days)/365.25)
+esds = esds[esds['epochdate'] > firstdatei.date()]
+frames = esds['frame'].unique()
+
+offsets = []
+for frame in frames:
+    dazes = esds[esds['frame'] == frame].daz_mm_notide_noiono_ok.values
+    years = esds[esds['frame'] == frame].years_since_beginning.values
+    offsets.append(get_pod_offset(dazes, years))
+
+offsets = np.array(offsets)
+# filtering - offset would not be larger than... 150 mm?
+offsets = offsets[np.abs(offsets)<150]
+
+meanoffset = np.nanmean(offsets)
+stderr = np.nanstd(offsets, ddof=3)/np.sqrt(len(offsets))
+'''

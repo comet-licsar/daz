@@ -15,6 +15,26 @@ def get_daz(frame):
     daztb = lq.do_pd_query('select * from esd where polyid={};'.format(polyid))
 
 
+'''
+how to get s1a/b? try this:
+frame = 
+polyid=fc.lq.get_frame_polyid(frame)[0][0]
+daztb = fc.lq.do_pd_query('select * from esd where polyid={};'.format(polyid))
+daztb = daztb.set_index(daztb.epoch).sort_index()
+daz = (daztb['daz'] + daztb['cc_azi'])*14000
+
+daz=daz[daz<1000][daz>-1000]
+s1bs = []
+s1as = []
+for e in daz.index:
+    if (np.mod((e - daz.index[0]).days, 12) == 0):
+        s1as.append(e)
+    else:
+        s1bs.append(e)
+B = daz[np.isin(daz.index, s1bs)]
+A = daz[np.isin(daz.index, s1as)]
+
+'''
 def get_azshift_SD(offile):
     azshift_SD = float(grep1line('azimuth_offset_polynomial', offile).split()[1])
     return azshift_SD
@@ -117,7 +137,7 @@ def generate_framespd(fname = 'esds2021_frames.txt', outcsv = 'framespd_2021.csv
     a.to_csv(outcsv, float_format='%.4f', index=False)
 
 
-def get_dfDC(path_to_slcdir, f0=5405000500, burst_interval = 2.758277, returnka = True):
+def get_dfDC(path_to_slcdir, f0=5405000500, burst_interval = 2.758277, returnka = True, returnperswath = False):
     #f0 = get_param_gamma('radar_frequency', parfile)
     #burst_interval = get_param_gamma('burst_interval', topsparfile)
     parfile = glob.glob(path_to_slcdir+'/????????.slc.par')[0]
@@ -173,8 +193,9 @@ def get_dfDC(path_to_slcdir, f0=5405000500, burst_interval = 2.758277, returnka 
         dfDC.append(kt*burst_interval) #burst_interval is time within the burst... we can also just calculate.. see Grandin: eq 15: hal.archives-ouvertes.fr/hal-01621519/document
         #ok, that's the thing - burst_interval is actually t(n+1) - t(n) - see remotesensing-12-01189-v2
         #so it should be kt * -burst_interval, that is why GAMMA has the -kt J ... ok, good to realise this
-    dfDC = np.mean(dfDC)
-    ka = np.mean(kas)
+    if not returnperswath:
+        dfDC = np.mean(dfDC)
+        ka = np.mean(kas)
     #kr = np.mean(krs)
     if returnka:
         return dfDC, ka #, kr
@@ -212,8 +233,51 @@ def get_shifts_from_qualfile(qualfile):
 
 
 def get_rangeshift_ICC(offile):
-    azshift_SD = float(grep1line('azimuth_offset_polynomial', offile).split()[1])
-    return azshift_SD
+    # ok but this is 0 in offset files..
+    rshift = float(grep1line('range_offset_polynomial', offile).split()[1])
+    return rshift
+
+
+def fix_oldorb_update_lt(ltfile, offile, azshiftm = 0.0039):
+    #samples = int(grep1line('interferogram_width', offile).split()[-1])
+    #azoff = float(grep1line('azimuth_offset_polynomial', offile).split()[1])
+    #offile2 = 
+    # to correct:
+    #gc_map_fine ltfile samples offile2 ltfile_ok 1
+    
+    ltfile_out = ltfile #+'.ok'
+    lines = int(grep1line('interferogram_azimuth_lines', offile).split()[-1])
+    samples = int(grep1line('interferogram_width', offile).split()[-1])
+    azires = float(grep1line('interferogram_azimuth_pixel_spacing', offile).split()[1])
+    a = np.fromfile(ltfile,dtype=np.complex64).byteswap()
+    b = a.reshape((lines,samples))
+    az = np.imag(b)
+    rg = np.real(b)
+    azshiftpx = azshiftm/azires
+    # correct only non-zero values
+    az[az!=0]-=azshiftpx
+    # return to cpx
+    cpx = rg + 1j*az
+    cpx.byteswap().tofile(ltfile_out)
+
+
+def fix_oldorb_update_off(offile, azshiftm=-0.0039):
+    '''
+    offset file azimuth shift in azimuth_offset_polynomial appears to be in SLC pixel, not multilooked..
+    '''
+    azires = float(grep1line('interferogram_azimuth_pixel_spacing', offile).split()[1])
+    azilooks = int(grep1line('interferogram_azimuth_looks', offile).split()[1])
+    aziorigres = azires / azilooks
+    # get previous estimate from off file
+    azioffset = float(grep1line('azimuth_offset_polynomial', offile).split()[1])
+    azshiftpx = azshiftm/aziorigres
+    # should be -39 mm here to fit the RDC-resampled data.. checking now
+    aziok = azioffset + azshiftpx
+    # get it back to the off file
+    oldstr='azimuth_offset_polynomial.*'
+    newstr='azimuth_offset_polynomial: '+str(aziok)+' 0.0 0.0 0.0 0.0 0.0'
+    sed_replace(oldstr, newstr, offile)
+
 
 
 def get_azshift_lt(ltfile = '20210425.mli.lt', offile = '20210413_20210425.off.start', az_ml = 4, rg_ml = 20, return_rg = True):
