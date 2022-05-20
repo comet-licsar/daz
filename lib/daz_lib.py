@@ -422,6 +422,100 @@ def decompose_framespd(framespd, cell_size = 2.25, crs = "EPSG:4326"):
 import pandas as pd
 import os
 
+def get_s1b_offsets(esds, framespd, col = 'daz_mm_notide_noiono'):
+    offsets = []
+    for frame in framespd['frame'].head():
+        #print(frame)
+        fpd = framespd[framespd['frame'] == frame]
+        epd = esds[esds['frame'] == frame]
+        offset = get_s1b_offset(epd, fpd)
+        offsets.append(offset)
+    framespd['s1ab_offset_mm'] = offsets
+    return framespd
+
+
+def get_s1b_offset(epd, fpd, col = 'daz_mm_notide_noiono', fix_pod_offset = True, 
+                   split_by_pod = True, fit_offset = False, return_model = False, startfromnoiono = True ):
+    '''
+    epd = selected esd pandas dataframe
+    fpd - selected frame pd df
+    '''
+    if fit_offset and fix_pod_offset:
+        print('you do not want to do both..')
+        return False
+    try:
+        epd = epd.set_index(epd.epochdate)
+        epd = epd.sort_index()
+    except:
+        print('')
+    if startfromnoiono:
+        stdate=pd.Timestamp('2016-07-30').date()
+        epd = epd[epd.index>stdate]
+        if epd.empty:
+            return np.nan
+    dazes = epd[col].copy() #.values
+    poddate = pd.Timestamp('2020-07-30').date()
+    if fix_pod_offset:
+        dazes[dazes.index<=poddate]-=39
+    epochdates = epd.index.values
+    years = epd.years_since_beginning.values
+    dazes = dazes.values
+    masterdate = pd.Timestamp(fpd.master.values[0])
+    mastersat = fpd.s1AorB.values[0]
+    isB = flag_s1b(epochdates, masterdate, mastersat)
+    if not split_by_pod:
+        if fit_offset:
+            is_pre = (epochdates<=poddate).astype(np.int0)
+            A = np.vstack((years,np.ones_like(years),isB, is_pre)).T
+            model = np.linalg.lstsq(A,dazes, rcond=False)[0]
+            cAB = model[2]
+            pod_offset = model[3]
+            if not return_model:
+                return pod_offset
+        else:
+            # now, we do d = A m, where A is of dt, 1, isB:
+            A = np.vstack((years,np.ones_like(years),isB)).T
+            model = np.linalg.lstsq(A,dazes, rcond=False)[0]
+    else:
+        # now, we do d = A m, where A is of dt, 1, isB_pre, isB_post:
+        isB_pre = (epochdates<=poddate).astype(np.int0)*isB
+        isB_post = (epochdates>poddate).astype(np.int0)*isB
+        minepochs = 10
+        if (np.sum(isB_pre) < minepochs) or (np.sum(isB_post) < minepochs):
+            return np.nan
+        A = np.vstack((years,np.ones_like(years),isB_pre, isB_post)).T
+        model = np.linalg.lstsq(A,dazes, rcond=False)[0]
+        cAB_pre = model[2]
+        cAB_post = model[3]
+        cdiff = cAB_post - cAB_pre
+        if not return_model:
+            return cdiff
+    if not return_model:
+        #v = model[0]
+        #c = model[1]
+        c_AB = model[2]
+        if c_AB == 0:
+            return np.nan
+        else:
+            return c_AB
+    else:
+        return model
+
+
+def flag_s1b(epochdates, masterdate, mastersat = 'A'):
+    if mastersat == 'B':
+        masterdate = masterdate + pd.Timedelta('6 days')
+    isB = []
+    for epoch in epochdates:
+        # ok, give +- 1 day tolerance due to midnight issue
+        if np.abs(np.mod((epoch - masterdate.date()).days, 12)) <= 1:
+            isB.append(0)
+        else:
+            isB.append(1)
+    isB = np.array(isB)
+    return isB
+
+
 def get_pod_offset(dazes, years, thresyears = 4, minsamples = 15):
     r2 = np.ones_like(years)
     r3 = np.ones_like(years)
