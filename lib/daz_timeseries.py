@@ -10,6 +10,30 @@ def get_rmse(y, y_pred, ddof=2):
     return np.sqrt( np.sum(np.square(y - y_pred)) / (len(y)-ddof) )
 
 
+def model_filter(A, y, limrms=3, iters=2):
+    '''
+    limrms is 'how many RMSEs should be used to remove outliers'
+    '''
+    model = np.linalg.lstsq(A,y, rcond=False)[0]
+    ddof = A.shape[1]
+    y_pred = np.sum(A*model,axis=1)
+    rmse = get_rmse(y, y_pred, ddof=ddof)
+    for i in range(iters):
+        count = len(y)
+        # reducing dataset
+        sel = np.abs(y_pred - y)<limrms*rmse
+        y = y[sel]
+        if len(y)==count:
+            break
+        A = A[sel]
+        # second iteration (only)
+        model = np.linalg.lstsq(A,y, rcond=False)[0]
+        y_pred = np.sum(A*model,axis=1)
+        rmse = get_rmse(y, y_pred, ddof=ddof)
+    stderr = np.sqrt(rmse**2/len(y))
+    return model, stderr
+
+
 def get_stdvel(rmse, tmatrix):
     count = tmatrix.shape[0]
     #add column of ones to the tmatrix:

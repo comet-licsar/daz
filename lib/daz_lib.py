@@ -241,17 +241,20 @@ def df_get_itrf_slopes(framespd):
     return framespd
 
 
-def df_compare_new_orbits(esds):
+def df_compare_new_orbits(esds, col = 'daz_mm_notide_noiono_grad_OK'):
+    '''
+    first attempt, not really used function
+    '''
     std_diffs = []
     for frame, selected_frame_esds in esds.groupby('frame'):
-        neworb = selected_frame_esds[selected_frame_esds['epochdate'] > pd.Timestamp('20200731')]
+        neworb = selected_frame_esds[selected_frame_esds['epochdate'] > pd.Timestamp('20200730')]
         oldorb = selected_frame_esds[selected_frame_esds['epochdate'] > pd.Timestamp('20170101')]
         oldorb = oldorb[oldorb['epochdate'] < pd.Timestamp('20200730')]
         if (not neworb.empty) and (not oldorb.empty):
             if not len(oldorb) < len(neworb):
                 oldorb = oldorb.tail(len(neworb))
-                std_old = oldorb['daz_mm_notide_noiono_grad_OK'].std()
-                std_new = neworb['daz_mm_notide_noiono_grad_OK'].std()
+                std_old = oldorb[col].std()
+                std_new = neworb[col].std()
                 std_diffs.append(std_new - std_old)
     std_diffs = np.array(std_diffs)
     return std_diffs
@@ -424,7 +427,7 @@ import os
 
 def get_s1b_offsets(esds, framespd, col = 'daz_mm_notide_noiono'):
     offsets = []
-    for frame in framespd['frame'].head():
+    for frame in framespd['frame']:
         #print(frame)
         fpd = framespd[framespd['frame'] == frame]
         epd = esds[esds['frame'] == frame]
@@ -434,8 +437,11 @@ def get_s1b_offsets(esds, framespd, col = 'daz_mm_notide_noiono'):
     return framespd
 
 
+
+from daz_timeseries import get_rmse, model_filter
+
 def get_s1b_offset(epd, fpd, col = 'daz_mm_notide_noiono', fix_pod_offset = True, 
-                   split_by_pod = True, fit_offset = False, return_model = False, startfromnoiono = True ):
+                   split_by_pod = True, fit_offset = False, return_model = False, startfromnoiono = True, mincount = 80 ):
     '''
     epd = selected esd pandas dataframe
     fpd - selected frame pd df
@@ -454,9 +460,9 @@ def get_s1b_offset(epd, fpd, col = 'daz_mm_notide_noiono', fix_pod_offset = True
         if epd.empty:
             return np.nan
     dazes = epd[col].copy() #.values
-    poddate = pd.Timestamp('2020-07-30').date()
+    poddate = pd.Timestamp('2020-07-30')
     if fix_pod_offset:
-        dazes[dazes.index<=poddate]-=39
+        dazes[dazes.index<poddate]-=39
     epochdates = epd.index.values
     years = epd.years_since_beginning.values
     dazes = dazes.values
@@ -465,9 +471,10 @@ def get_s1b_offset(epd, fpd, col = 'daz_mm_notide_noiono', fix_pod_offset = True
     isB = flag_s1b(epochdates, masterdate, mastersat)
     if not split_by_pod:
         if fit_offset:
-            is_pre = (epochdates<=poddate).astype(np.int0)
+            is_pre = (epochdates<poddate).astype(np.int0)
             A = np.vstack((years,np.ones_like(years),isB, is_pre)).T
-            model = np.linalg.lstsq(A,dazes, rcond=False)[0]
+            model, stderr = model_filter(A, dazes)
+            #model = np.linalg.lstsq(A,dazes, rcond=False)[0]
             cAB = model[2]
             pod_offset = model[3]
             if not return_model:
@@ -475,16 +482,18 @@ def get_s1b_offset(epd, fpd, col = 'daz_mm_notide_noiono', fix_pod_offset = True
         else:
             # now, we do d = A m, where A is of dt, 1, isB:
             A = np.vstack((years,np.ones_like(years),isB)).T
-            model = np.linalg.lstsq(A,dazes, rcond=False)[0]
+            model, stderr = model_filter(A, dazes)
+            #model = np.linalg.lstsq(A,dazes, rcond=False)[0]
     else:
         # now, we do d = A m, where A is of dt, 1, isB_pre, isB_post:
-        isB_pre = (epochdates<=poddate).astype(np.int0)*isB
-        isB_post = (epochdates>poddate).astype(np.int0)*isB
+        isB_pre = (epochdates<poddate).astype(np.int0)*isB
+        isB_post = (epochdates>=poddate).astype(np.int0)*isB
         minepochs = 10
         if (np.sum(isB_pre) < minepochs) or (np.sum(isB_post) < minepochs):
             return np.nan
         A = np.vstack((years,np.ones_like(years),isB_pre, isB_post)).T
-        model = np.linalg.lstsq(A,dazes, rcond=False)[0]
+        model, stderr = model_filter(A, dazes)
+        #model = np.linalg.lstsq(A,dazes, rcond=False)[0]
         cAB_pre = model[2]
         cAB_post = model[3]
         cdiff = cAB_post - cAB_pre
@@ -499,7 +508,8 @@ def get_s1b_offset(epd, fpd, col = 'daz_mm_notide_noiono', fix_pod_offset = True
         else:
             return c_AB
     else:
-        return model
+        #get rmse -> stderr, return it
+        return model, stderr
 
 
 def flag_s1b(epochdates, masterdate, mastersat = 'A'):
