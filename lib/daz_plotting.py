@@ -249,6 +249,103 @@ def plot_decomposed(dec, col = 'noTI', saveit = False):
 
 
 
+# 2022-05-23 - figure for GRL - POD change effect
+'''
+dist=framespd[framespd['opass']=='A'].podoff5.rename('ascending frames')*-1
+dist2=framespd[framespd['opass']=='D'].podoff5.rename('descending frames')*-1
+dist3=framespd.podoff5.rename('all frames')*-1
+
+
+
+
+plt.style.use('seaborn-white')
+from palettable.colorbrewer.qualitative import Set2_7
+colors = Set2_7.mpl_colors
+
+params = {
+   'axes.labelsize': 8,
+   'font.size': 9,
+   'legend.fontsize': 8,
+   'figure.dpi' : 200,
+   #'xtick.labelsize': 10,
+   #'ytick.labelsize': 10,
+   #'text.usetex': False,
+   'figure.figsize': [3, 4]
+   # 'figure.figsize': [6, 4]
+   }
+plt.rcParams.update(params)
+
+
+fig, ax = plt.subplots()
+#fig = plt.figure(figsize=(8,4), dpi=100)
+#ax.set_xlim(-100,100)
+bins1 = 12
+bins = bins1*2
+ax = dist.plot.hist(density=False, legend=True, color=colors[2], histtype='stepfilled',
+                ax=ax, bins=bins1, grid=True, alpha=0.5, edgecolor='k', 
+                label='ascending frames')
+ax = dist2.plot.hist(density=False, legend=True, color=colors[4], histtype='stepfilled',
+                ax=ax, bins=bins1, grid=True, alpha=0.5, edgecolor='k',
+                label='descending frames')
+#dist3.plot.hist(density=True, legend=True,
+#                ax=ax, bins=60, grid=True, edgecolor='k', alpha=0.05, label='bagr')
+ax = dist3.plot.hist(density=False, legend=True, color=colors[4], histtype='step',
+                ax=ax, bins=bins, grid=True, alpha=0.85, edgecolor='red',linewidth=2,
+                label='all frames')
+
+               #title='Density histogram of $\Delta(\sigma_{post}-\sigma_{pre})$', 
+
+median_both = dist3.median()
+mean_both = dist3.mean()
+print('median values are:')
+print(dist.median())
+print(dist2.median())
+print(dist3.median())
+
+print('mean values are:')
+print(dist.mean())
+print(dist2.mean())
+print(dist3.mean())
+
+print('count:')
+print(dist3.count())
+
+
+
+ax.set_xlim(-120,80)
+ax.set_xlim(-100,100)
+#ax.set_ylim(0,0.4)
+#ax.set_title("Estimates of $\Delta a$ offset due to POD change")
+ax.set_title("$\Delta a$ offset due to orbits change")
+ax.grid(True)
+
+stderr_median=np.sqrt(dist3.var()/dist3.count())*2*1.253
+ax.axvline(median_both, color='k', linewidth=1, alpha = 0.7, linestyle='dashed', label='$\overline{\delta \Delta a}$ ='+str(int(np.round(median_both)))+'$\pm$'+str(np.round(stderr_median,1))+' mm')
+#ax.axvline(mean_both, color='k', linewidth=1, alpha = 0.7, linestyle='dashed')
+ax.set_ylim(0,90)
+min_ylim, max_ylim = ax.get_ylim()
+#ax.text(median_both+2, max_ylim*0.939, '$\overline{\delta \Delta a}$',
+#        fontsize=11)
+#ax.text(median_both-14, max_ylim*0.939, '$\overline{\delta \Delta a}$',
+#        fontsize=11)
+#ax.axvline(mean_both, color='k', linewidth=1, alpha = 0.7, linestyle='dashed')
+#ax.text(mean_both, max_ylim*0.95, ' $\mu_{\Delta,post}=$'+'{:.2f} mm'.format(mean_both),
+#        fontsize=9)
+
+#the daz_ARP = -39 mm
+ax.axvline(-39, color='b', linewidth=1, alpha = 0.7, label='$\Delta a_{ARP}$ = -39 mm')
+#ax.text(-39+2, max_ylim*0.945, '$daz_{ARP}$ = -39 mm', color='b', fontsize=11)
+#ax.text(-39+1, max_ylim*0.941, '$\Delta a_{ARP}$', color='b', fontsize=11)
+#ax.legend(facecolor='white', framealpha=1, loc='lower left')
+legend = ax.legend(frameon = 1, loc='upper right')
+frame = legend.get_frame()
+frame.set_facecolor('white')
+frame.set_linewidth(0)
+ax.set_xlabel('mm')
+'''
+
+
+
 
 #20210809 - figures for GRL article:
 
@@ -301,6 +398,10 @@ def figure_compare(esds):
     fig.savefig('fig_hist.png', dpi=150)
 
     print(dist.median())
+
+
+
+
 
 
 '''

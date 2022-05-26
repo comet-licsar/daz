@@ -185,16 +185,16 @@ def df_calculate_slopes(esdsin, framespdin, alpha = 2.5, eps = 1.5, bycol = 'daz
             print('error getting RMSE (all points are outliers?), using NaN value')
             rmse = np.nan
         #
-        framespd.at[frameta.index, 'slope_'+bycol+'_mmyear'] = slope
-        framespd.at[frameta.index, 'intercept_'+bycol+'_mmyear'] = intercept + correctback
+        framespd.at[frameta.index.values[0], 'slope_'+bycol+'_mmyear'] = slope
+        framespd.at[frameta.index.values[0], 'intercept_'+bycol+'_mmyear'] = intercept + correctback
         # add the rest:
         #keeping the older approach, but perhaps not needed...?
         residuals = y - y_pred
-        framespd.at[frameta.index, bycol+'_RMSE_selection'] = rmse
-        framespd.at[frameta.index, bycol+'_count_selection'] = len(residuals)
-        framespd.at[frameta.index, bycol+'_RMSE_full'] = rmse_full
+        framespd.at[frameta.index.values[0], bycol+'_RMSE_selection'] = rmse
+        framespd.at[frameta.index.values[0], bycol+'_count_selection'] = len(residuals)
+        framespd.at[frameta.index.values[0], bycol+'_RMSE_full'] = rmse_full
         # the STD mmy is perhaps the best estimate - kudos to Andy Hooper for this error propagation calculation approach
-        framespd.at[frameta.index, bycol+'_RMSE_mmy_full'] = std_vel_full
+        framespd.at[frameta.index.values[0], bycol+'_RMSE_mmy_full'] = std_vel_full
         #
         # adding std/rmse for velocity - error propagation - this would be ok, but we do not know exact/real shift - so using based on the model here!
         years = grsel.years_since_beginning.max() - grsel.years_since_beginning.min()
@@ -202,7 +202,7 @@ def df_calculate_slopes(esdsin, framespdin, alpha = 2.5, eps = 1.5, bycol = 'daz
         # std vel is from http://ipl.physics.harvard.edu/wp-uploads/2013/03/PS3_Error_Propagation_sp13.pdf - 'should' be right, but perhaps it is not?
         rms_vel_full = abs((rmse_full/shift_mm) * slope)
         rms_vel_sel = abs((rmse/shift_mm) * slope)
-        framespd.at[frameta.index, bycol+'_RMSE_mmy_full_error_multi'] = rms_vel_full
+        framespd.at[frameta.index.values[0], bycol+'_RMSE_mmy_full_error_multi'] = rms_vel_full
         esds.update(grsel['is_outlier_'+bycol])
     return esds, framespd
 

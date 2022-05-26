@@ -84,7 +84,7 @@ def generate_framespd(fname = 'esds2021_frames.txt', outcsv = 'framespd_2021.csv
     a['centre_range_m']=0.00
     a['centre_time']=''
     a['ka']=0.00
-    a['kr']=0.00
+    #a['kr']=0.00
     a['dfDC'] = 0.00
     for i,row in a.iterrows():
         frame=row['frame']
@@ -96,35 +96,36 @@ def generate_framespd(fname = 'esds2021_frames.txt', outcsv = 'framespd_2021.csv
             continue
         primepoch = grep1line('master=',metafile).split('=')[1]
         path_to_slcdir = os.path.join(os.environ['LiCSAR_procdir'], str(tr), frame, 'SLC', primepoch)
-        if frame == '174A_05407_121212':
-            heading = -10.157417
-            azimuth_resolution = 13.968690
-            avg_incidence_angle = 39.5118
-            centre_range_m = 878941.4133
-            centre_time = '14:52:00'
-    #        kt = 
-        else:
-            try:
-                heading = float(grep1line('heading',metafile).split('=')[1])
-                azimuth_resolution = float(grep1line('azimuth_resolution',metafile).split('=')[1])
-                avg_incidence_angle = float(grep1line('avg_incidence_angle',metafile).split('=')[1])
-                centre_range_m = float(grep1line('centre_range_m',metafile).split('=')[1])
-                centre_time = grep1line('center_time',metafile).split('=')[1]
-            except:
-                print('some error occurred during frame '+frame)
-                azimuth_resolution = 0
-                avg_incidence_angle = 0
-                centre_range_m = 0
-                centre_time = 0
-                heading = 0
+        # 
+        #if frame == '174A_05407_121212':
+        #    heading = -10.157417
+        #    azimuth_resolution = 13.968690
+        #    avg_incidence_angle = 39.5118
+        #    centre_range_m = 878941.4133
+        #    centre_time = '14:52:00'
+    #   #     kt = 
+        try:
+            heading = float(grep1line('heading',metafile).split('=')[1])
+            azimuth_resolution = float(grep1line('azimuth_resolution',metafile).split('=')[1])
+            avg_incidence_angle = float(grep1line('avg_incidence_angle',metafile).split('=')[1])
+            centre_range_m = float(grep1line('centre_range_m',metafile).split('=')[1])
+            centre_time = grep1line('center_time',metafile).split('=')[1]
+        except:
+            print('some error occurred during frame '+frame)
+            azimuth_resolution = 0
+            avg_incidence_angle = 0
+            centre_range_m = 0
+            centre_time = 0
+            heading = 0
     #        kt = float(grep1line('kt=',metafile).split('=')[1])
         try:
-            dfDC, ka, kr = get_dfDC(path_to_slcdir)
+            #dfDC, ka, kr = get_dfDC(path_to_slcdir)
+            dfDC, ka = get_dfDC(path_to_slcdir)
         except:
             print('some error occurred during frame '+frame)
             dfDC = 0
             ka = 0
-            kr = 0
+            #kr = 0
         a.at[i,'heading'] = heading
         a.at[i,'azimuth_resolution']  = azimuth_resolution
         a.at[i,'avg_incidence_angle']  = avg_incidence_angle
@@ -133,7 +134,7 @@ def generate_framespd(fname = 'esds2021_frames.txt', outcsv = 'framespd_2021.csv
     #    a.at[i,'kt']  = kt
         a.at[i,'dfDC']  = dfDC
         a.at[i,'ka']  = ka
-        a.at[i,'kr']  = kr
+        #a.at[i,'kr']  = kr
     a.to_csv(outcsv, float_format='%.4f', index=False)
 
 
