@@ -306,7 +306,7 @@ def decompose_azi2NE(df, col = 'daz_mm_notide_noiono_grad'):
 
 
 # get ITRF N, E values
-def get_itrf_EN(df):
+def get_itrf_EN(df, samplepoints=3):
     itrfs_N = []
     itrfs_E = []
     itrfs_rms_N = []
@@ -321,9 +321,9 @@ def get_itrf_EN(df):
         # use a median over 'whole' frame:
         Es = []
         Ns = []
-        for i in range(round(clon*10-23.4/2),round(clon*10+23.4/2)+1,5):
+        for i in range(round(clon*10-23.4/2),round(clon*10+23.4/2)+1,samplepoints):
             lon = i/10
-            for j in range(round(clat*10-23.4/2),round(clat*10+23.4/2)+1,5):
+            for j in range(round(clat*10-23.4/2),round(clat*10+23.4/2)+1,samplepoints):
                 lat = j/10
                 try:
                     E, N = get_ITRF_ENU(lat, lon)

@@ -401,6 +401,183 @@ def figure_compare(esds):
 
 
 
+# 2022-06-15 - final fig for AHB plot:
+'''
+import pygmt
+import numpy as np
+#dec = a.copy(deep=True)
+#dec = bagr.copy(deep=True)
+strTI = 'noTI'
+#dec = dec2
+
+dec['VEL_E'] = dec['VEL_E_'+strTI]
+dec['VEL_N'] = dec['VEL_N_'+strTI]
+dec['RMSE_VEL_N'] = dec['RMSE_VEL_N_'+strTI]
+dec['RMSE_VEL_E'] = dec['RMSE_VEL_E_'+strTI]
+
+dec = dec[abs(dec['VEL_E']) < 100]
+dec = dec[dec['RMSE_VEL_E'] < 35]
+
+median_diff_E = dec['VEL_E'].median() - dec['ITRF_E'].median()
+median_diff_N = dec['VEL_N'].median() - dec['ITRF_N'].median()
+print('median E: '+str(median_diff_E))
+print('median N: '+str(median_diff_N))
+# check without median correction
+median_diff_E = 0
+median_diff_N = 0
+
+df = pd.DataFrame(
+    data={
+        "x": dec.centroid_lon.values,
+        "y": dec.centroid_lat.values,
+        "east_velocity": dec.VEL_E.values, # [0, 3, 4, 6, -6, 6],
+        "north_velocity": dec.VEL_N.values, # [0, 3, 6, 4, 4, -4],
+        "east_sigma": np.zeros_like(dec.centroid_lon.values), # [4, 0, 4, 6, 6, 6],
+        "north_sigma": np.zeros_like(dec.centroid_lon.values), # [6, 0, 6, 4, 4, 4],
+        "correlation_EN": np.zeros_like(dec.centroid_lon.values), # [0.5, 0.5, 0.5, 0.5, -0.5, -0.5],
+        "SITE": dec.index.values, #["0x0", "3x3", "4x6", "6x4", "-6x4", "6x-4"],
+    }
+)
+
+df_unc = pd.DataFrame(
+    data={
+        "x": dec.centroid_lon.values,
+        "y": dec.centroid_lat.values,
+        "east_velocity": dec.VEL_E.values, # [0, 3, 4, 6, -6, 6],
+        "north_velocity": dec.VEL_N.values, # [0, 3, 6, 4, 4, -4],
+        "east_sigma": 2*dec.RMSE_VEL_E.values, # [4, 0, 4, 6, 6, 6],
+        "north_sigma": 2*dec.RMSE_VEL_N.values, # [6, 0, 6, 4, 4, 4],
+        "correlation_EN": np.zeros_like(dec.centroid_lon.values), # [0.5, 0.5, 0.5, 0.5, -0.5, -0.5],
+        "SITE": dec.index.values, #["0x0", "3x3", "4x6", "6x4", "-6x4", "6x-4"],
+    }
+)
+
+df_noT = pd.DataFrame(
+    data={
+        "x": dec.centroid_lon.values,
+        "y": dec.centroid_lat.values,
+        "east_velocity": dec.VEL_E_noT.values, # [0, 3, 4, 6, -6, 6],
+        "north_velocity": dec.VEL_N_noT.values, # [0, 3, 6, 4, 4, -4],
+        "east_sigma": np.zeros_like(dec.centroid_lon.values), #2*dec.RMSE_VEL_E_noT.values, # [4, 0, 4, 6, 6, 6],
+        "north_sigma": np.zeros_like(dec.centroid_lon.values), #2*dec.RMSE_VEL_N_noT.values, # [6, 0, 6, 4, 4, 4],
+        "correlation_EN": np.zeros_like(dec.centroid_lon.values), # [0.5, 0.5, 0.5, 0.5, -0.5, -0.5],
+        "SITE": dec.index.values, #["0x0", "3x3", "4x6", "6x4", "-6x4", "6x-4"],
+    }
+)
+
+df_itrf = pd.DataFrame(
+    data={
+        "x": dec.centroid_lon.values,
+        "y": dec.centroid_lat.values,
+        "east_velocity": dec.ITRF_E.values, # [0, 3, 4, 6, -6, 6],
+        "north_velocity": dec.ITRF_N.values, # [0, 3, 6, 4, 4, -4],
+        "east_sigma": np.zeros_like(dec.centroid_lon.values),
+        "north_sigma": np.zeros_like(dec.centroid_lon.values),
+        "correlation_EN": np.zeros_like(dec.centroid_lon.values), # [0.5, 0.5, 0.5, 0.5, -0.5, -0.5],
+        "SITE": dec.index.values, #["0x0", "3x3", "4x6", "6x4", "-6x4", "6x-4"],
+    }
+)
+
+df['east_velocity'] = df['east_velocity'] - median_diff_E
+df['north_velocity'] = df['north_velocity'] - median_diff_N
+x = dec.centroid_lon.values
+y = dec.centroid_lat.values
+cpxEN = dec.ITRF_E.values + 1j*dec.ITRF_N.values
+#cpxEN = dec['VEL_E'].values - median_diff + 1j*dec['VEL_N'].values
+
+direction = np.degrees(np.angle(cpxEN))
+length = np.abs(cpxEN) # in mm/year
+
+region=[25, 113, 22, 45]
+
+
+fig = pygmt.Figure()
+pygmt.config(MAP_FRAME_TYPE="plain")
+fig.coast(
+    region=region,
+    #region=[-180, 180, -50, 50],
+    projection="M0/0/30c",
+    #projection="T35/10c",
+    #frame=True,
+    #frame=["WSne", "2g2f"],
+    frame=["WNse", "5f", "a5f" ],
+    #frame='a.5f.25WNse',
+    borders=False,
+    shorelines="0.01p,black",
+    area_thresh=4000,
+    land="lightgray",
+    water="lightblue1",
+)
+
+# plot faults to the background
+fig.plot(data=faults, pen="0.1p,darkgray", label="faults")
+
+# first plot uncertainties (background)
+fig.velo(
+    data=df_unc,
+    region=region,
+    pen="0.4p,blue",
+    uncertaintycolor="whitesmoke",
+    #label='uncertainty',
+    transparency=60,
+    line=True,
+    spec="e0.02/0.39/18",
+    #projection="x0.8c",
+    vector="0.25c+p1p+e+gblue",
+)
+
+# then plot arrows with only tides corrected vels
+fig.velo(
+    data=df_noT,
+    region=region,
+    pen="0.1p,black,-",
+    #uncertaintycolor="whitesmoke",
+    line=True,
+    #label='SETcorrected',
+    spec="e0.02/0.39/18",
+    #projection="x0.8c",
+    vector="0.1c+e+gblack",
+)
+
+# then the ITRF2014 PMM
+fig.velo(
+    data=df_itrf,
+    region=region,
+    pen="0.4p,red",
+    #label='ITRF2014',
+    #uncertaintycolor="lightblue1",
+    line=True,
+    spec="e0.02/0.39/18",
+    #projection="x0.8c",
+    vector="0.25c+e+gred",
+)
+
+# finally (blue) final velocities
+fig.velo(
+    data=df,
+    region=region,
+    pen="0.4p,blue",
+    #uncertaintycolor="whitesmoke",
+    line=True,
+    #label='finalvel',
+    spec="e0.02/0.39/18",
+    #projection="x0.8c",
+    #vector="0.25c+p1.5p+e+gblue",
+    vector="0.25c+e+gblue",
+)
+
+#fig.plot(
+#    x=x,
+#    y=y,
+#    #style="v0.1025c+ea+bc",
+#    #style="v0.05c+ea+bc",
+#    direction=[direction, length/100],
+#    pen="0.3p",
+#    color="blue3",
+#)
+
+fig.savefig('AHBa2b_'+strTI+'.png', dpi = 200)
+'''
 
 
 
