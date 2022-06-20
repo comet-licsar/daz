@@ -628,3 +628,137 @@ offsets = offsets[np.abs(offsets)<150]
 meanoffset = np.nanmean(offsets)
 stderr = np.nanstd(offsets, ddof=3)/np.sqrt(len(offsets))
 '''
+
+
+
+
+
+
+
+
+
+
+'''
+this is figure for AHB E,N plot:
+
+#col = 'noTI' #noTI or noT for notide+noiono and notide
+#median_diff = dec['VEL_E_'+col].median() - dec['ITRF_E'].median()
+
+import numpy as np
+#dec = a.copy(deep=True)
+dec = bagr.copy(deep=True)
+strTI = 'noT'
+
+
+dec['VEL_E'] = dec['VEL_E_'+strTI]
+dec['VEL_N'] = dec['VEL_N_'+strTI]
+dec['RMSE_VEL_N'] = dec['RMSE_VEL_N_'+strTI]
+dec['RMSE_VEL_E'] = dec['RMSE_VEL_E_'+strTI]
+
+dec = dec[abs(dec['VEL_E']) < 100]
+dec = dec[dec['RMSE_VEL_E'] < 35]
+
+median_diff_E = dec['VEL_E'].median() - dec['ITRF_E'].median()
+median_diff_N = dec['VEL_N'].median() - dec['ITRF_N'].median()
+print('median E: '+str(median_diff_E))
+print('median N: '+str(median_diff_N))
+# check without median correction
+median_diff_E = 0
+median_diff_N = 0
+
+df = pd.DataFrame(
+    data={
+        "x": dec.centroid_lon.values,
+        "y": dec.centroid_lat.values,
+        "east_velocity": dec.VEL_E.values, # [0, 3, 4, 6, -6, 6],
+        "north_velocity": dec.VEL_N.values, # [0, 3, 6, 4, 4, -4],
+        "east_sigma": 2*dec.RMSE_VEL_E.values, # [4, 0, 4, 6, 6, 6],
+        "north_sigma": 2*dec.RMSE_VEL_N.values, # [6, 0, 6, 4, 4, 4],
+        "correlation_EN": np.zeros_like(dec.centroid_lon.values), # [0.5, 0.5, 0.5, 0.5, -0.5, -0.5],
+        "SITE": dec.index.values, #["0x0", "3x3", "4x6", "6x4", "-6x4", "6x-4"],
+    }
+)
+
+df_itrf = pd.DataFrame(
+    data={
+        "x": dec.centroid_lon.values,
+        "y": dec.centroid_lat.values,
+        "east_velocity": dec.ITRF_E.values, # [0, 3, 4, 6, -6, 6],
+        "north_velocity": dec.ITRF_N.values, # [0, 3, 6, 4, 4, -4],
+        "east_sigma": np.zeros_like(dec.centroid_lon.values),
+        "north_sigma": np.zeros_like(dec.centroid_lon.values),
+        "correlation_EN": np.zeros_like(dec.centroid_lon.values), # [0.5, 0.5, 0.5, 0.5, -0.5, -0.5],
+        "SITE": dec.index.values, #["0x0", "3x3", "4x6", "6x4", "-6x4", "6x-4"],
+    }
+)
+
+df['east_velocity'] = df['east_velocity'] - median_diff_E
+df['north_velocity'] = df['north_velocity'] - median_diff_N
+x = dec.centroid_lon.values
+y = dec.centroid_lat.values
+cpxEN = dec.ITRF_E.values + 1j*dec.ITRF_N.values
+#cpxEN = dec['VEL_E'].values - median_diff + 1j*dec['VEL_N'].values
+
+direction = np.degrees(np.angle(cpxEN))
+length = np.abs(cpxEN) # in mm/year
+
+region=[25, 113, 22, 45]
+
+
+fig = pygmt.Figure()
+pygmt.config(MAP_FRAME_TYPE="plain")
+fig.coast(
+    region=region,
+    #region=[-180, 180, -50, 50],
+    projection="M0/0/30c",
+    #projection="T35/10c",
+    #frame=True,
+    #frame=["WSne", "2g2f"],
+    frame=["WNse", "5f", "a5f" ],
+    #frame='a.5f.25WNse',
+    borders=False,
+    shorelines="0.01p,black",
+    area_thresh=4000,
+    land="lightgray",
+    water="lightblue1",
+)
+
+fig.velo(
+    data=df,
+    region=region,
+    pen="0.2p",
+    uncertaintycolor="whitesmoke",
+    line=True,
+    spec="e0.02/0.39/18",
+    #projection="x0.8c",
+    vector="0.2c+p1p+e+gblack",
+)
+
+
+fig.velo(
+    data=df_itrf,
+    region=region,
+    pen="0.1p,red",
+    #uncertaintycolor="lightblue1",
+    line=True,
+    spec="e0.02/0.39/18",
+    #projection="x0.8c",
+    vector="0.1c+p0.5p+e+gred",
+)
+
+
+#fig.plot(
+#    x=x,
+#    y=y,
+#    #style="v0.1025c+ea+bc",
+#    #style="v0.05c+ea+bc",
+#    direction=[direction, length/100],
+#    pen="0.3p",
+#    color="blue3",
+#)
+
+#fig.savefig('AHBa2b_'+strTI+'.png', dpi = 200)
+fig.savefig(os.path.join('AHBa_MAY_'+strTI+'.pdf'), dpi = 320)
+fig.show()
+
+'''
