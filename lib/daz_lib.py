@@ -182,16 +182,26 @@ def df_preprepare_esds(esdsin, framespdin, firstdate = '', countlimit = 25):
 
 #######################################
 # step 4 - get plate motion model
-################### ITRF2014
+################### ITRF2014 (or GSRM_2014)
 
-def get_ITRF_ENU(lat, lon):
+def get_ITRF_ENU(lat, lon, model='gsrm_2014'):
+    '''Gets plate motion model values from UNAVCO website
+    
+    Args
+        lat (float): latitude
+        lon (float): longitude
+        model (string): choose model code, e.g. 'gsrm_2014', 'itrf2014',.. see lines after l. 571 of `view-source:https://www.unavco.org/software/geodetic-utilities/plate-motion-calculator/plate-motion-calculator.html`
+    
+    Returns
+        float, float: east and north component of plate motion in given coordinates
+    '''
     url = "https://www.unavco.org/software/geodetic-utilities/plate-motion-calculator/plate-motion/model"
     # data to be sent to api
     data = {'name':'modelform',
         'id':'modelform',
         'lat':str(lat),
         'lon':str(lon),
-        'model':'itrf2014',
+        'model':model,
         'format':'ascii'}
     # sending post request and saving response as response object
     r = requests.post(url = url, data = data)
