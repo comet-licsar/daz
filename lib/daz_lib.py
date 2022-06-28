@@ -315,8 +315,30 @@ def decompose_azi2NE(df, col = 'daz_mm_notide_noiono_grad'):
                          })
 
 
+def get_GPS_EN(lat, lon, velnc='velok.nc'):
+    '''Gets E,N velocities from external file.
+    I prepared the velok.nc file from data available in supplementary files of article:
+    Basically, I used the existing velocities and correctly georeferenced them to WGS-84 frame.
+    '''
+    if not os.path.exists(velnc):
+        print('the file with velocities does not exist, exiting')
+        return False
+    E = float(vels.sel(lon=178.5, lat=85.1, method='nearest').VEL_E.values)
+    return E,N
+
+
 # get ITRF N, E values
-def get_itrf_EN(df, samplepoints=3):
+def get_itrf_EN(df, samplepoints=3, velnc='velok.nc'):
+    '''Gets EN velocities from ITRF2014 plate motion model (auto-extract from UNAVCO website)
+    In case velnc exists, it will be used instead of the model. I know it is bit misleading, as this is not ITRF model. Instead,
+    I prepared the velok.nc file from data available in supplementary files of article DOI:10.1002/2014GC005407
+    Basically, I used the existing velocities and correctly georeferenced them to WGS-84 frame.
+    '''
+    usevel = False
+    if os.path.exists(velnc):
+        print('found velocities nc file - using it instead of ITRF2014')
+        vels=xr.open_dataset(velnc)
+        usevel = True
     itrfs_N = []
     itrfs_E = []
     itrfs_rms_N = []
@@ -335,13 +357,19 @@ def get_itrf_EN(df, samplepoints=3):
             lon = i/10
             for j in range(round(clat*10-23.4/2),round(clat*10+23.4/2)+1,samplepoints):
                 lat = j/10
-                try:
-                    E, N = get_ITRF_ENU(lat, lon)
+                if not usevel:
+                    try:
+                        E, N = get_ITRF_ENU(lat, lon)
+                        Es.append(E)
+                        Ns.append(N)
+                        #itrfs.append(EN2azi(N, E, heading))
+                    except:
+                        print('connection error')
+                else:
+                    E = float(vels.sel(lon=lon, lat=lat, method='nearest').VEL_E.values)
+                    N = float(vels.sel(lon=lon, lat=lat, method='nearest').VEL_N.values)
                     Es.append(E)
                     Ns.append(N)
-                    #itrfs.append(EN2azi(N, E, heading))
-                except:
-                    print('connection error')
         itrfs_E.append(np.mean(Es))
         itrfs_N.append(np.mean(Ns))
         itrfs_rms_E.append(np.std(Es,ddof=1))
