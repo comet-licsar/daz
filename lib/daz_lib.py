@@ -184,13 +184,14 @@ def df_preprepare_esds(esdsin, framespdin, firstdate = '', countlimit = 25):
 # step 4 - get plate motion model
 ################### ITRF2014 (or GSRM_2014)
 
-def get_ITRF_ENU(lat, lon, model='gsrm_2014'):
+def get_ITRF_ENU(lat, lon, model='itrf2014', refto='NNR'):
     '''Gets plate motion model values from UNAVCO website
     
     Args
         lat (float): latitude
         lon (float): longitude
         model (string): choose model code, e.g. 'gsrm_2014', 'itrf2014',.. see lines after l. 571 of `view-source:https://www.unavco.org/software/geodetic-utilities/plate-motion-calculator/plate-motion-calculator.html`
+        refto (string): choose reference plate, e.g. 'NNR', 'EU',... see lines on the link above after line 683
     
     Returns
         float, float: east and north component of plate motion in given coordinates
@@ -202,6 +203,7 @@ def get_ITRF_ENU(lat, lon, model='gsrm_2014'):
         'lat':str(lat),
         'lon':str(lon),
         'model':model,
+        'reference':refto,
         'format':'ascii'}
     # sending post request and saving response as response object
     r = requests.post(url = url, data = data)
@@ -328,7 +330,7 @@ def get_GPS_EN(lat, lon, velnc='velok.nc'):
 
 
 # get ITRF N, E values
-def get_itrf_EN(df, samplepoints=3, velnc='velok.nc'):
+def get_itrf_EN(df, samplepoints=3, velnc='velok.nc', refto='NNR'):
     '''Gets EN velocities from ITRF2014 plate motion model (auto-extract from UNAVCO website)
     In case velnc exists, it will be used instead of the model. I know it is bit misleading, as this is not ITRF model. Instead,
     I prepared the velok.nc file from data available in supplementary files of article DOI:10.1002/2014GC005407
@@ -359,7 +361,7 @@ def get_itrf_EN(df, samplepoints=3, velnc='velok.nc'):
                 lat = j/10
                 if not usevel:
                     try:
-                        E, N = get_ITRF_ENU(lat, lon)
+                        E, N = get_ITRF_ENU(lat, lon, refto=refto)
                         Es.append(E)
                         Ns.append(N)
                         #itrfs.append(EN2azi(N, E, heading))
