@@ -500,9 +500,10 @@ def get_s1b_offset(epd, fpd, col = 'daz_mm_notide_noiono', fix_pod_offset = True
         if epd.empty:
             return np.nan
     dazes = epd[col].copy() #.values
-    poddate = pd.Timestamp('2020-07-30')
+    poddateA = pd.Timestamp('2020-07-29')
+    poddateB = pd.Timestamp('2020-07-30')
     if fix_pod_offset:
-        dazes[dazes.index<poddate]-=39
+        dazes[dazes.index<poddateB]-=39   # only for preview, so no bother here
     epochdates = epd.index.values
     years = epd.years_since_beginning.values
     dazes = dazes.values
@@ -511,7 +512,8 @@ def get_s1b_offset(epd, fpd, col = 'daz_mm_notide_noiono', fix_pod_offset = True
     isB = flag_s1b(epochdates, masterdate, mastersat)
     if not split_by_pod:
         if fit_offset:
-            is_pre = (epochdates<poddate).astype(np.int0)
+            is_pre = (epochdates<poddateA).astype(np.int0)
+            is_pre[isB] = (epochdates[isB]<poddateB).astype(np.int0)
             A = np.vstack((years,np.ones_like(years),isB, is_pre)).T
             model, stderr = model_filter(A, dazes)
             #model = np.linalg.lstsq(A,dazes, rcond=False)[0]
@@ -526,8 +528,8 @@ def get_s1b_offset(epd, fpd, col = 'daz_mm_notide_noiono', fix_pod_offset = True
             #model = np.linalg.lstsq(A,dazes, rcond=False)[0]
     else:
         # now, we do d = A m, where A is of dt, 1, isB_pre, isB_post:
-        isB_pre = (epochdates<poddate).astype(np.int0)*isB
-        isB_post = (epochdates>=poddate).astype(np.int0)*isB
+        isB_pre = (epochdates<poddateB).astype(np.int0)*isB
+        isB_post = (epochdates>=poddateB).astype(np.int0)*isB
         minepochs = 10
         if (np.sum(isB_pre) < minepochs) or (np.sum(isB_post) < minepochs):
             return np.nan
