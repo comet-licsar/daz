@@ -13,7 +13,7 @@ from daz_lib import *
 def get_daz(frame):
     polyid=lq.get_frame_polyid(frame)[0][0]
     daztb = lq.do_pd_query('select * from esd where polyid={};'.format(polyid))
-
+    return daztb
 
 '''
 how to get s1a/b? try this: BUT CAREFUL! daz might be just daztb.daz (not plus cc_azi - check it first)
