@@ -1,0 +1,58 @@
+uaz_values.csv
+==============
+Contains u_az values and other relevant data in columns:
+frame - ID of related frame (same as in frame_values.csv)
+esd_master - reference acquisition epoch
+epoch - date of acquisition epoch
+daz_total_wrt_orbits - original extracted azimuth shift w.r.t. orbits
+daz_cc_wrt_orbits - original extracted azimuth shift w.r.t. orbits from intensity cross-correlation (prior to spectral diversity)
+drg_wrt_orbits - original extracted range shift w.r.t. orbits
+orbits_precision - precision of applied orbits (P..precise, R..restituted)
+version - orbits version
+daz_iono_grad_mm - u_az from ionosphere propagation
+tecs_A - estimated TECs at centre of hyphotetical burst A
+tecs_A - estimated TECs at centre of hyphotetical burst B
+daz_mm_notide - u_az after correction of solid-earth tides
+daz_mm_notide_noiono_grad - u_az after correction of solid-earth tides and ionospheric gradient propagation
+is_outlier_* - flag of outlier datapoint, as identified through Huber loss function (related to velocity estimates in frame_values.csv)
+
+frame_values.csv
+================
+Contains along-track velocity estimates and other relevant data in columns:
+frame - ID of related frame
+master - reference acquisition epoch
+center_lon - longitude coordinate of the frame centre
+center_lat - latitude coordinate of the frame centre
+heading - satellite heading angle (from the geograpic north)
+azimuth_resolution - extracted azimuth pixel spacing (in metres)
+range_resolution - extracted range pixel spacing (in metres)
+avg_incidence_angle - average incidence angle of the frame
+centre_range_m - approximate slant distance between the satellite and centre of the frame
+centre_time - acquisition time (UTC) of centre of the frame at the reference epoch (appliable to other epochs)
+s1AorB - flag of S-1A or B of the reference epoch
+slope_plates_vel_azi_itrf2014 - along-track velocity estimated from ITRF2014 plate motion model
+slope_daz_mm_mmyear - estimated along-track velocity from the original u_az values (in mm/year)
+slope_daz_mm_notide_mmyear - estimated along-track velocity from u_az values after correction on solid-earth tides
+slope_daz_mm_notide_noiono_grad_mmyear - estimated along-track velocity from u_az values after correction on solid-earth tides and ionosphere
+intercept_* - corresponding intercept (in mm)
+*_RMSE_selection - RMSE of outlier-free u_az data samples
+*_count_selection - count of outlier-free u_az data samples used to estimate corresponding velocity
+*_RMSE_mmy_full - RMSE from all u_az data samples applying corresponding velocity and intercept (in mm/year)
+
+
+
+
+decomposed_grid.csv
+===================
+Contains decomposed velocities (in 250x250 km spacing grid) and other relevant data in columns:
+count - count of frames used for the decomposition
+opass - orbital pass codes of the input frames (D..descending, A..ascending)
+centroid_lon - longitude coordinate of the grid cell centre
+centroid_lat - latitude coordinate of the grid cell centre
+VEL_N_noTI - northward velocity component from data corrected for solid-earth tides and ionosphere
+VEL_E_noTI - eastward velocity component from data corrected for solid-earth tides and ionosphere
+VEL_N_noT - northward velocity component from data corrected for solid-earth tides
+VEL_E_noT - eastward velocity component from data corrected for solid-earth tides
+ITRF_N - northward velocity component from averaged ITRF2014 plate motion model
+ITRF_E - eastward velocity component from averaged ITRF2014 plate motion model
+*RMSE_* - RMSE of corresponding data
