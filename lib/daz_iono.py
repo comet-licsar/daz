@@ -232,7 +232,9 @@ def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = Fal
         epochdate = a['epochdate']
         # first, get IPP - ionosphere pierce point
         # range to IPP can be calculated using:
-        range_IPP = hiono/np.sin(theta)
+        # range_IPP = hiono/np.sin(theta)
+        # but maybe not... let's do it simpler:
+        range_IPP = slantRange * hiono / sat_alt
         x, y, z = aer2ecef(azimuthDeg, elevationDeg, range_IPP, scene_center_lat, scene_center_lon, scene_alt)
         ippg_lat, ippg_lon, ipp_alt = ecef2latlonhei(x, y, z)
         Pippg = wgs84.GeoPoint(latitude=ippg_lat, longitude=ippg_lon, degrees=True)
