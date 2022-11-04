@@ -15,6 +15,63 @@ def get_daz(frame):
     daztb = lq.do_pd_query('select * from esd where polyid={};'.format(polyid))
     return daztb
 
+
+def get_center_vel(parfile):
+    center_time=get_param_gamma('center_time', parfile, floatt = True, pos = 0)
+    if not os.path.exists(parfile+'.orb'):
+        rc = os.system("ORB_prop_SLC "+parfile+" - - - 1 >/dev/null; ORB_prop_SLC "+parfile+" - - - 1 | grep 'output sv' > "+parfile+".orb")
+    #time.sleep(0.5)
+    sv = pd.read_csv(parfile+'.orb', delim_whitespace=True,header=None)
+    svvs = []
+    for i in sv[6]:
+        svvi=get_param_gamma('state_vector_velocity_'+str(i), parfile, pos=0)
+        #svvi=get_param_gamma('state_vector_velocity_'+str(i), parfile, pos=2)
+        svvs.append(svvi)
+    sv['vel1']=svvs
+    # least squares to get vel for given center_time:
+    x=sv[3].values
+    A = np.vstack([x, np.ones(len(x))]).T
+    y = sv['vel1'].values
+    m, c = np.linalg.lstsq(A, y, rcond=None)[0]
+    center_vel=m*center_time+c
+    return center_vel
+
+
+def get_velocities_per_sat(rslcdir='RSLC'):
+    epochs=os.listdir(rslcdir)
+    epochspd=pd.DataFrame(epochs)
+    sats=[]
+    vel1s=[]
+    for epoch in epochs:
+        print(epoch)
+        parfile=os.path.join(rslcdir,epoch,epoch+'.rslc.par')
+        if os.path.exists(parfile):
+            sat=get_param_gamma('sensor', parfile, floatt = False, pos = 0)
+            vel1=get_center_vel(parfile)
+        else:
+            sat=''
+            vel1=np.nan
+        sats.append(sat)
+        vel1s.append(vel1)
+    epochspd['sat']=sats
+    epochspd['vel1']=vel1s
+    epochspd=epochspd.dropna()
+    epochspd['epochdate'] = epochspd.apply(lambda x : pd.to_datetime(str(x[0])).date(), axis=1)
+    epochspd=epochspd.set_index(epochspd['epochdate']).sort_index()
+    return epochspd
+
+
+'''
+import matplotlib.pyplot as plt
+vel2=epochspd.copy(deep=True)
+epochspd=get_velocities_per_sat(rslcdir)
+pp=epochspd[epochspd['sat']=='S1A'].plot()
+epochspd[epochspd['sat']=='S1B'].plot(ax=pp)
+plt.show()
+'''
+
+
+
 '''
 how to get s1a/b? try this: BUT CAREFUL! daz might be just daztb.daz (not plus cc_azi - check it first)
 frame = 
