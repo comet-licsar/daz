@@ -82,7 +82,7 @@ def fit_huber(x, y, alpha = 1, epsilon=1.2, outinyears = True):
     if xisdate and outinyears:
         slope = slope*365.25
         std_vel = std_vel*365.25
-    return slope, intercept, std_vel, ypred, huber.outliers_
+    return slope, intercept, std_vel, y_pred, huber.outliers_
 
 
 def df_calculate_slopes(esdsin, framespdin, alpha = 2.5, eps = 1.5, bycol = 'daz_mm_notide', subset = True, roll_assist = False):
