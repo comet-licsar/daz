@@ -10,7 +10,7 @@ import framecare as fc
 # maybe not needed?
 from daz_lib import *
 
-def get_daz(frame):
+def get_daz_frame(frame):
     polyid=lq.get_frame_polyid(frame)[0][0]
     daztb = lq.do_pd_query('select * from esd where polyid={};'.format(polyid))
     return daztb
@@ -396,6 +396,7 @@ import datetime as dt
 import warnings
 warnings.filterwarnings("ignore")
 from LiCSquery import *
+import shutil
 
 def fix_oldorb_shift_oneoff(frame):
     ''' Careful - to be run only once!
@@ -409,7 +410,13 @@ def fix_oldorb_shift_oneoff(frame):
     if not os.path.exists(tmpdir):
         os.mkdir(tmpdir)
     master = fc.get_master(frame)
-    mastersat = fc.get_master(frame, asfilenames=True)[0][2]
+    try:
+        mastersat = fc.get_master(frame, asfilenames=True)[0][2]
+    except:
+        try:
+            mastersat = os.path.basename(glob.glob(framedir+'/SLC/*/*EOF')[0])[2]
+        except:
+            mastersat = 'A'
     lutdir = os.path.join(os.environ['LiCSAR_procdir'], track, frame, 'LUT')
     logdir = os.path.join(os.environ['LiCSAR_procdir'], track, frame, 'log')
     #
@@ -432,9 +439,12 @@ def fix_oldorb_shift_oneoff(frame):
             azishift_SD = get_azshift_SD(offile)
         else:
             # error with LUT file, mv to bck:
+            if not os.path.exists(bckdir):
+                os.mkdir(bckdir)
             rc=shutil.move(os.path.join(lutdir,epoch+'.7z'), os.path.join(bckdir,epoch+'.7z'))
-            azishift_SD = 0.0
+            azishift_SD = np.nan
         # now get more info from qualfile
+        rslc3 = int(master)
         qualfile = os.path.join(logdir, 'coreg_quality_{0}_{1}.log'.format(master, epoch))
         if os.path.exists(qualfile):
             try:
@@ -456,10 +466,53 @@ def fix_oldorb_shift_oneoff(frame):
             print('ERROR - coreg qual file does not exist')
             daz_icc, dr_icc, daz_sd = np.nan, np.nan, np.nan
             daz_sd = azishift_SD
-        table = table.append({'epoch':int(epoch), 'mdate': mdate, 'RSLC3': rslc3, 'azshift_SD': azishift_SD, 'daz_SD': daz_sd, 'daz_ICC': daz_icc, 'dr_ICC': dr_icc}, ignore_index=True)
+        if azishift_SD == np.nan:
+            azishift_SD = daz_sd
+        if azishift_SD != np.nan:
+            table = table.append({'epoch':int(epoch), 'mdate': mdate, 'RSLC3': rslc3, 'azshift_SD': azishift_SD, 'daz_SD': daz_sd, 'daz_ICC': daz_icc, 'dr_ICC': dr_icc}, ignore_index=True)
     #
-    # get epochs 'to correct', i.e. that used old orb files, and if they were used for RSLC3:
-    #tocorrectepochs = []
+    table['epochdate'] = table.epoch.astype(int).astype(str)
+    table['epochdate'] = table.apply(lambda x : pd.to_datetime(str(x.epochdate)).date(), axis=1)
+    dazdb = get_daz_frame(frame)
+    # fill non-existing
+    for i,row in table[table.isna().sum(axis=1)==0].iterrows():
+        if not np.isin(row.epochdate, dazdb.epoch.values):
+        #if row.epochdate not in dazdb.epoch:
+            print('updating database for epoch '+str(row.epoch))
+            epoch=str(row.epoch)
+            rslc3=str(row.RSLC3)
+            daz=row.azshift_SD
+            ccazi=row.daz_ICC
+            ccrg = row.dr_ICC
+            try:
+                eofile = glob.glob(os.path.join(os.environ['LiCSAR_procdir'], track, frame, 'SLC', master, '*EOF'))[0]
+                orb=os.path.basename(eofile)
+            except:
+                orb='imported from LUT'
+            lq.ingest_esd(frame, epoch, rslc3, daz, ccazi, ccrg, orb, overwrite=False)
+    # add from non-fixed db records
+    dazdb = dazdb[dazdb['orbfile']!='fixed_as_in_GRL']
+    for i,row in dazdb.iterrows():
+        if not np.isin(row.epoch, table.epochdate.values):
+            print('adding from db :'+str(row.epoch))
+            epoch = int(row.epoch.strftime('%Y%m%d'))
+            try:
+                mdate = int(row.orbfile.split('_')[5].split('T')[0])
+            except:
+                mdate = np.nan
+            rslc3 = int(row.rslc3.strftime('%Y%m%d'))
+            azishift_SD = row.daz
+            daz_sd = row.daz
+            daz_icc = row.cc_azi
+            dr_icc = row.cc_range
+            table = table.append({'epoch':int(epoch), 'mdate': mdate, 
+            'RSLC3': rslc3, 'azshift_SD': azishift_SD, 'daz_SD': daz_sd, 
+            'daz_ICC': daz_icc, 'dr_ICC': dr_icc, 'epochdate': row.epoch}, ignore_index=True)
+        
+        
+        
+        # get epochs 'to correct', i.e. that used old orb files, and if they were used for RSLC3:
+        #tocorrectepochs = []
     O = table[table['epoch']<20200729]
     O = O[O['mdate']<20210614]
     tocorrectepochs = O.epoch.astype(int).astype(str)
@@ -472,8 +525,6 @@ def fix_oldorb_shift_oneoff(frame):
         allepochs = list(table.epoch.astype(int).values) + [int(master)]
         missingrslc3s = table[~table.RSLC3.astype(int).isin(allepochs)].RSLC3.astype(int).unique()
         if len(missingrslc3s)>0:
-            table['epochdate'] = table.epoch.astype(int).astype(str)
-            table['epochdate'] = table.apply(lambda x : pd.to_datetime(str(x.epochdate)).date(), axis=1)
             print('missing rslcs detected, substituting')
             #possible_rslc3s = table[table.RSLC3.astype(int).isin(allepochs)].RSLC3.astype(int).unique()
             affected = table[table.RSLC3.astype(int).isin(missingrslc3s)].epoch.astype(int).values
@@ -489,7 +540,7 @@ def fix_oldorb_shift_oneoff(frame):
                 substitute = possible_rslc3s[substitute_i]
                 selec = table[table['RSLC3'].astype(int)==missing].index
                 table.loc[selec,'RSLC3'] = substitute
-        #
+            #
     while checkit == 1:
         tocheck = table[table['RSLC3'].astype(int).astype(str).isin(tocorrectepochs)]
         #tocheck = tocheck[~tocheck['epoch'].astype(int).astype(str).isin(tocorrectepochs)]
@@ -497,17 +548,30 @@ def fix_oldorb_shift_oneoff(frame):
         if tocheck.empty:
             checkit = 0
         else:
+            print('iteration of OR')
             tocorrectepochs = tocorrectepochs + list(tocheck.values)
-        #
-    for epoch in tocorrectepochs:
-        # now for those needed, update the value in off:
+            #
+    if len(tocorrectepochs)>0:
+        tocorrectepochs = list(set(tocorrectepochs)) # remove duplicates
+        tocorrectepochs.sort()
+        print('correcting '+str(len(tocorrectepochs))+' epochs between '+str(tocorrectepochs[0])+' and '+str(tocorrectepochs[-1]))
         if not os.path.exists(bckdir):
             os.mkdir(bckdir)
+    for epoch in tocorrectepochs:
+        # now for those needed, update the value in off:
         offile = os.path.join(tmpdir, epoch, master+'_'+epoch+'.off')
-        rc=shutil.copyfile(os.path.join(lutdir,epoch+'.7z'), os.path.join(bckdir,epoch+'.7z'))
+        if os.path.exists(os.path.join(lutdir,epoch+'.7z')):
+            try:
+                rc=shutil.copyfile(os.path.join(lutdir,epoch+'.7z'), os.path.join(bckdir,epoch+'.7z'))
+            except:
+                print('error copying LUT of '+str(epoch))
         try:
-            newazishift = fix_oldorb_update_off(offile, azshiftm=-0.039, returnval = True)
-            rc = os.system('cd {0}; 7za u {1} {2}/{3}_{2}.off>/dev/null'.format(tmpdir, os.path.join(lutdir,epoch+'.7z'), epoch, master))
+            try:
+                newazishift = fix_oldorb_update_off(offile, azshiftm=-0.039, returnval = True)
+                rc = os.system('cd {0}; 7za u {1} {2}/{3}_{2}.off>/dev/null'.format(tmpdir, os.path.join(lutdir,epoch+'.7z'), epoch, master))
+            except:
+                print('error updating off file in LUT of '+str(epoch))
+                newazishift = float(table[table.epoch == int(epoch)].azshift_SD)-39/14000
             # now also change the coreg_qual file - or just .. move it away...
             qualfile = os.path.join(logdir, 'coreg_quality_{0}_{1}.log'.format(master, epoch))
             rc = os.system('mv {0} {1}/.'.format(qualfile, bckdir))
