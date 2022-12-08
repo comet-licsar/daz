@@ -3,7 +3,7 @@
 import LiCSquery as lq
 import numpy as np
 from LiCSAR_lib.LiCSAR_misc import *
-import os
+import os, glob
 import pandas as pd
 import framecare as fc
 
@@ -130,6 +130,30 @@ def get_param_gamma(param, parfile, floatt = True, pos = 0):
     return a
 
 
+def get_frame_master_s1ab(frame):
+    tr = int(frame[:3])
+    metafile = os.path.join(os.environ['LiCSAR_public'], str(tr), frame, 'metadata', 'metadata.txt')
+    if not os.path.exists(metafile):
+        print('metadata file does not exist for frame '+frame)
+        return 'X'
+    primepoch = grep1line('master=',metafile).split('=')[1]
+    path_to_slcdir = os.path.join(os.environ['LiCSAR_procdir'], str(tr), frame, 'SLC', primepoch)
+    try:
+        out = os.path.basename(glob.glob(path_to_slcdir+'/S1*')[0])[2]
+    except:
+        print('error getting the value for frame '+frame)
+        out = 'X'
+    return out
+
+
+def extract_frame_master_s1abs(framespd):
+    s1abs = []
+    for frame in framespd.frame:
+        s1abs.append(get_frame_master_s1ab(frame))
+    framespd['S1AorB'] = s1abs
+    return framespd
+
+
 def generate_framespd(fname = 'esds2021_frames.txt', outcsv = 'framespd_2021.csv'):
     ### fname is input file containing list of frames to generate the frames csv table
     #in the form of:
@@ -192,6 +216,7 @@ def generate_framespd(fname = 'esds2021_frames.txt', outcsv = 'framespd_2021.csv
         a.at[i,'dfDC']  = dfDC
         a.at[i,'ka']  = ka
         #a.at[i,'kr']  = kr
+    a = extract_frame_master_s1abs(a)
     a.to_csv(outcsv, float_format='%.4f', index=False)
 
 
@@ -296,7 +321,7 @@ def get_rangeshift_ICC(offile):
     return rshift
 
 
-def fix_oldorb_update_lt(ltfile, offile, azshiftm = 0.0039):
+def fix_oldorb_update_lt(ltfile, offile, azshiftm = 0.039):
     #samples = int(grep1line('interferogram_width', offile).split()[-1])
     #azoff = float(grep1line('azimuth_offset_polynomial', offile).split()[1])
     #offile2 = 
@@ -319,9 +344,10 @@ def fix_oldorb_update_lt(ltfile, offile, azshiftm = 0.0039):
     cpx.byteswap().tofile(ltfile_out)
 
 
-def fix_oldorb_update_off(offile, azshiftm=-0.0039):
+def fix_oldorb_update_off(offile, azshiftm=-0.039, returnval = False):
     '''
     offset file azimuth shift in azimuth_offset_polynomial appears to be in SLC pixel, not multilooked..
+    ok - it is actually all correct (12/2022)
     '''
     azires = float(grep1line('interferogram_azimuth_pixel_spacing', offile).split()[1])
     azilooks = int(grep1line('interferogram_azimuth_looks', offile).split()[1])
@@ -335,6 +361,160 @@ def fix_oldorb_update_off(offile, azshiftm=-0.0039):
     oldstr='azimuth_offset_polynomial.*'
     newstr='azimuth_offset_polynomial: '+str(aziok)+' 0.0 0.0 0.0 0.0 0.0'
     sed_replace(oldstr, newstr, offile)
+    if returnval:
+        return aziok
+
+
+
+def fix_oldorb_shift_oneoff_track(track=2):
+    ''' Careful - to be run only once!
+    This will modify LUT tables and coreg_quality files, so that daz will include shift due to updated orbits.
+    This means: for all O and OR, shift the values by -39 mm, where O=epoch resampled using old orbits, OR=epoch that was using O as RSLC3
+    '''
+    frames=os.listdir(os.path.join(os.environ['LiCSAR_procdir'], str(track)))
+    for frame in frames:
+        try:
+            master = fc.get_master(frame)
+        except:
+            continue
+        #masterfile = os.path.join(os.environ['LiCSAR_procdir'], track, frame, 'SLC', master, )
+        #cdate_master = 
+        if int(master) > 20210614:
+            # this was day of updating orbits. everything above is OK!
+            continue
+        '''
+        eofile = glob.glob(os.path.join(os.environ['LiCSAR_procdir'], track, frame, 'SLC', master, '*EOF'))[0]
+        eofile=os.path.basename(eofile)
+        eofdate = eofile.split('_')[5].split('T')[0]
+        '''
+        print('processing frame '+frame)
+        fix_oldorb_shift_oneoff(frame)
+    
+
+
+import datetime as dt
+import warnings
+warnings.filterwarnings("ignore")
+from LiCSquery import *
+
+def fix_oldorb_shift_oneoff(frame):
+    ''' Careful - to be run only once!
+    This will modify LUT tables and coreg_quality files, so that daz will include shift due to updated orbits.
+    This means: for all O and OR, shift the values by -39 mm, where O=epoch resampled using old orbits, OR=epoch that was using O as RSLC3
+    '''
+    track = str(int(frame[:3]))
+    framedir=os.path.join(os.environ['LiCSAR_procdir'], track, frame)
+    bckdir=os.path.join(os.environ['LiCSAR_procdir'], track, frame, 'backup')
+    tmpdir = '/work/scratch-pw3/licsar/earmla/temp3/'+frame
+    if not os.path.exists(tmpdir):
+        os.mkdir(tmpdir)
+    master = fc.get_master(frame)
+    mastersat = fc.get_master(frame, asfilenames=True)[0][2]
+    lutdir = os.path.join(os.environ['LiCSAR_procdir'], track, frame, 'LUT')
+    logdir = os.path.join(os.environ['LiCSAR_procdir'], track, frame, 'log')
+    #
+    table = pd.DataFrame(columns=['epoch', 'mdate', 'RSLC3', 'azshift_SD', 'daz_SD', 'daz_ICC', 'dr_ICC'])
+    print('checking and updating')
+    for z in os.listdir(lutdir):
+        epoch = z.split('.')[0]
+        #if int(epoch) > 20200800:
+        #print('processing epoch '+epoch)
+        # first process the LUT file:
+        lutfile = os.path.join(lutdir,z)
+        mdate = dt.datetime.fromtimestamp(os.path.getmtime(lutfile))
+        mdate = int(mdate.strftime('%Y%m%d'))
+        #rc = os.system('cd {0}; 7za x {1} {2}/{3}_{2}.off>/dev/null'.format(tmpdir, lutfile, epoch, master))
+        #ltfile = os.path.join(tmpdir, epoch, master+'_'+epoch+'.slc.mli.lt')
+        offile = os.path.join(tmpdir, epoch, master+'_'+epoch+'.off')
+        if not os.path.exists(offile):
+            rc = os.system('cd {0}; 7za x {1} {2}/{3}_{2}.off>/dev/null'.format(tmpdir, lutfile, epoch, master))
+        if os.path.exists(offile):
+            azishift_SD = get_azshift_SD(offile)
+        else:
+            # error with LUT file, mv to bck:
+            rc=shutil.move(os.path.join(lutdir,epoch+'.7z'), os.path.join(bckdir,epoch+'.7z'))
+            azishift_SD = 0.0
+        # now get more info from qualfile
+        qualfile = os.path.join(logdir, 'coreg_quality_{0}_{1}.log'.format(master, epoch))
+        if os.path.exists(qualfile):
+            try:
+                daz_icc, dr_icc, daz_sd = get_shifts_from_qualfile(qualfile)
+            except:
+                print('Some error reading qualfile - please check this file manually: {}'.format(qualfile))
+                daz_icc, dr_icc, daz_sd = np.nan, np.nan, np.nan
+                daz_sd = azishift_SD
+            try:
+                rslc3 = grep1line('Spectral diversity estimation',qualfile).split(':')[-1]
+                if not rslc3:
+                    rslc3 = int(master)
+                else:
+                    rslc3=int(rslc3.strip())
+            except:
+                print('error in qualfile to extract RSLC3 info')
+                rslc3= int(master)
+        else:
+            print('ERROR - coreg qual file does not exist')
+            daz_icc, dr_icc, daz_sd = np.nan, np.nan, np.nan
+            daz_sd = azishift_SD
+        table = table.append({'epoch':int(epoch), 'mdate': mdate, 'RSLC3': rslc3, 'azshift_SD': azishift_SD, 'daz_SD': daz_sd, 'daz_ICC': daz_icc, 'dr_ICC': dr_icc}, ignore_index=True)
+    #
+    # get epochs 'to correct', i.e. that used old orb files, and if they were used for RSLC3:
+    #tocorrectepochs = []
+    O = table[table['epoch']<20200729]
+    O = O[O['mdate']<20210614]
+    tocorrectepochs = O.epoch.astype(int).astype(str)
+    if not tocorrectepochs.empty:
+        tocorrectepochs = list(tocorrectepochs.values)
+        checkit = 1
+    else:
+        checkit = 0
+    if checkit == 1:
+        allepochs = list(table.epoch.astype(int).values) + [int(master)]
+        missingrslc3s = table[~table.RSLC3.astype(int).isin(allepochs)].RSLC3.astype(int).unique()
+        if len(missingrslc3s)>0:
+            table['epochdate'] = table.epoch.astype(int).astype(str)
+            table['epochdate'] = table.apply(lambda x : pd.to_datetime(str(x.epochdate)).date(), axis=1)
+            print('missing rslcs detected, substituting')
+            #possible_rslc3s = table[table.RSLC3.astype(int).isin(allepochs)].RSLC3.astype(int).unique()
+            affected = table[table.RSLC3.astype(int).isin(missingrslc3s)].epoch.astype(int).values
+            #possible_rslc3s = table[~table.epoch.astype(int).isin(affected)].epoch.astype(int).values
+            possible_rslc3s = table[~table.epoch.astype(int).isin(affected)].epochdate #.values
+            possible_rslc3s_ord = possible_rslc3s.apply(lambda x : pd.to_datetime(str(x)).toordinal()).values
+            possible_rslc3s = table[~table.epoch.astype(int).isin(affected)].epoch.values
+            for missing in missingrslc3s:
+                agg=pd.Timestamp(str(missing)).toordinal()
+                 #.unique()
+                #possible_rslc3s = table[table.RSLC3.astype(int).isin(allepochs)].RSLC3.astype(int).unique()
+                substitute_i = np.argmin(np.abs(possible_rslc3s_ord-agg))
+                substitute = possible_rslc3s[substitute_i]
+                selec = table[table['RSLC3'].astype(int)==missing].index
+                table.loc[selec,'RSLC3'] = substitute
+        #
+    while checkit == 1:
+        tocheck = table[table['RSLC3'].astype(int).astype(str).isin(tocorrectepochs)]
+        #tocheck = tocheck[~tocheck['epoch'].astype(int).astype(str).isin(tocorrectepochs)]
+        tocheck = tocheck[~tocheck['epoch'].astype(int).astype(str).isin(tocorrectepochs)].epoch.astype(int).astype(str)
+        if tocheck.empty:
+            checkit = 0
+        else:
+            tocorrectepochs = tocorrectepochs + list(tocheck.values)
+        #
+    for epoch in tocorrectepochs:
+        # now for those needed, update the value in off:
+        if not os.path.exists(bckdir):
+            os.mkdir(bckdir)
+        offile = os.path.join(tmpdir, epoch, master+'_'+epoch+'.off')
+        rc=shutil.copyfile(os.path.join(lutdir,epoch+'.7z'), os.path.join(bckdir,epoch+'.7z'))
+        try:
+            newazishift = fix_oldorb_update_off(offile, azshiftm=-0.039, returnval = True)
+            rc = os.system('cd {0}; 7za u {1} {2}/{3}_{2}.off>/dev/null'.format(tmpdir, os.path.join(lutdir,epoch+'.7z'), epoch, master))
+            # now also change the coreg_qual file - or just .. move it away...
+            qualfile = os.path.join(logdir, 'coreg_quality_{0}_{1}.log'.format(master, epoch))
+            rc = os.system('mv {0} {1}/.'.format(qualfile, bckdir))
+            # and finally update in database!
+            rc = update_esd(frame, epoch, colupdate = 'daz', valupdate = newazishift)
+        except:
+            print('some error with frame '+frame+', epoch '+str(epoch))
 
 
 
@@ -370,7 +550,7 @@ def get_table_azishifts(frame):
     #frame = '099A_05416_131313'
     #frame = '099A_05417_131313'
     master = fc.get_master(frame)
-    tmpdir = '/work/scratch-pw/earmla/LiCSAR_temp/batchdir/temp2'
+    tmpdir = '/work/scratch-pw3/licsar/earmla/temp'
     lutdir = os.path.join(os.environ['LiCSAR_procdir'], track, frame, 'LUT')
     logdir = os.path.join(os.environ['LiCSAR_procdir'], track, frame, 'log')
     table = pd.DataFrame(columns=['epoch', 'azshift_RDC_ICC', 'rgshift_RDC_ICC', 'azshift_SD', 'daz_ICC', 'dr_ICC'])

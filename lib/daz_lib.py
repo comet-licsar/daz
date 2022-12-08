@@ -554,19 +554,82 @@ def get_s1b_offset(epd, fpd, col = 'daz_mm_notide_noiono', fix_pod_offset = True
         return model, stderr
 
 
-def flag_s1b(epochdates, masterdate, mastersat = 'A'):
+def flag_s1b(epochdates, masterdate, mastersat = 'A', returnstr = False):
     if mastersat == 'B':
         masterdate = masterdate + pd.Timedelta('6 days')
     isB = []
     for epoch in epochdates:
         # ok, give +- 1 day tolerance due to midnight issue
         if np.abs(np.mod((epoch - masterdate.date()).days, 12)) <= 1:
-            isB.append(0)
+            if returnstr:
+                val = 'A'
+            else:
+                val = 0
         else:
-            isB.append(1)
+            if returnstr:
+                val = 'B'
+            else:
+                val = 1
+        isB.append(val)
     isB = np.array(isB)
     return isB
 
+
+def flag_s1b_esds(esds, framespd):
+    esds['S1AorB'] = 'X'
+    for frame, group in esds.groupby('frame'):
+        frameta = framespd[framespd['frame'] == frame]
+        if frameta.empty:
+            print('Warning, frame {} not found in framespd, skipping') #'using defaults'.format(frame))
+            continue
+        else:
+            mastersat = frameta.s1AorB.values[0]
+            if mastersat == 'X':
+                print('assuming S1A for master of frame '+frame)
+                mastersat = 'A'
+            masterdate = pd.Timestamp(str(frameta.master.values[0]))
+            epochdates = group.epochdate
+            group['S1AorB'] = flag_s1b(epochdates, masterdate, mastersat, returnstr = True)
+            esds.update(group)
+    return esds
+
+
+def fix_pod_offset(esds):
+    """Function to fix the 39 mm shift after new orbits in 2020-07-29/30
+    Args:
+        esds (pd.Dataframes)   as loaded (i.e. with the relevant daz columns)
+    """
+    col='daz_total_wrt_orbits'
+    #if 'S1AorB' not in esds.columns:
+    print('subtracting towards 2020-07-30')
+    #ddate = pd.Timestamp('2020-07-30')
+    #ep = esds[esds.epochdate < ddate][col]
+    ep = esds[esds.epoch < 20200730 ][col]
+    offset_px = 39/14000 #(framespd.azimuth_resolution.mean()*1000) # just a mean
+    esds.update(ep.subtract(offset_px))
+    return esds
+
+
+'''
+previously i was doing opposite, not ok for updates:
+    esds, framespd = load_csvs(esdscsv = indazfile, framescsv = inframesfile)
+    
+    # step 6+ -- correct for daz_ARP=-39 mm: 29th July for S1A and 30th July for S1B
+    #################
+    cols = ['daz_mm','daz_mm_notide', 'daz_mm_notide_noiono_grad']
+    if ('s1AorB' in framespd.columns) and ('s1AorB' not in esds.columns):
+        # ok, we can flag S1A/B and be more precise
+        esds = flag_s1b_esds(esds, framespd)
+        Bs = [esds['s1AorB']=='B']
+        epB = Bs[Bs.epochdate => pd.Timestamp('2020-07-30')][cols]
+        esds.update(epB.subtract(-39))
+        As = [esds['s1AorB']=='A']
+        epA = As[As.epochdate => pd.Timestamp('2020-07-29')][cols]
+        esds.update(epA.subtract(-39))
+    else:
+        ep = esds[esds.epochdate => pd.Timestamp('2020-07-30')][cols]
+        esds.update(ep.subtract(-39))
+'''
 
 def get_pod_offset(dazes, years, thresyears = 4, minsamples = 15):
     r2 = np.ones_like(years)

@@ -92,7 +92,10 @@ def main(argv=None):
     #framespd = pd.read_csv(inframesfile)
     esds, framespd = load_csvs(esdscsv = indazfile, framescsv = inframesfile)
     
+    '''
     # step 6+ -- correct for daz_ARP=-39 mm: 29th July for S1A and 30th July for S1B
+    #
+    # update 2022-12-07 - now done in the step daz_01 already
     #################
     cols = ['daz_mm','daz_mm_notide', 'daz_mm_notide_noiono_grad']
     if ('s1AorB' in framespd.columns) and ('s1AorB' not in esds.columns):
@@ -107,7 +110,7 @@ def main(argv=None):
     else:
         ep = esds[esds.epochdate => pd.Timestamp('2020-07-30')][cols]
         esds.update(ep.subtract(-39))
-    
+    '''
     
     # 2021-10-12: the original way:
     for col in ['daz_mm', 'daz_mm_notide', 'daz_mm_notide_noiono_grad']:
