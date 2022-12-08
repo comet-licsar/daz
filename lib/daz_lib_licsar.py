@@ -381,6 +381,7 @@ def fix_oldorb_shift_oneoff_track(track=2):
         #cdate_master = 
         if int(master) > 20210614:
             # this was day of updating orbits. everything above is OK!
+            print('frame '+frame+' is ok')
             continue
         '''
         eofile = glob.glob(os.path.join(os.environ['LiCSAR_procdir'], track, frame, 'SLC', master, '*EOF'))[0]
@@ -389,7 +390,7 @@ def fix_oldorb_shift_oneoff_track(track=2):
         '''
         print('processing frame '+frame)
         fix_oldorb_shift_oneoff(frame)
-    
+
 
 
 import datetime as dt
@@ -422,6 +423,8 @@ def fix_oldorb_shift_oneoff(frame):
     #
     table = pd.DataFrame(columns=['epoch', 'mdate', 'RSLC3', 'azshift_SD', 'daz_SD', 'daz_ICC', 'dr_ICC'])
     print('checking and updating')
+    if not os.path.exists(lutdir):
+        os.mkdir(lutdir)
     for z in os.listdir(lutdir):
         epoch = z.split('.')[0]
         #if int(epoch) > 20200800:
@@ -471,8 +474,9 @@ def fix_oldorb_shift_oneoff(frame):
         if azishift_SD != np.nan:
             table = table.append({'epoch':int(epoch), 'mdate': mdate, 'RSLC3': rslc3, 'azshift_SD': azishift_SD, 'daz_SD': daz_sd, 'daz_ICC': daz_icc, 'dr_ICC': dr_icc}, ignore_index=True)
     #
-    table['epochdate'] = table.epoch.astype(int).astype(str)
-    table['epochdate'] = table.apply(lambda x : pd.to_datetime(str(x.epochdate)).date(), axis=1)
+    if not table.empty:
+        table['epochdate'] = table.epoch.astype(int).astype(str)
+        table['epochdate'] = table.apply(lambda x : pd.to_datetime(str(x.epochdate)).date(), axis=1)
     dazdb = get_daz_frame(frame)
     # fill non-existing
     for i,row in table[table.isna().sum(axis=1)==0].iterrows():
@@ -508,9 +512,6 @@ def fix_oldorb_shift_oneoff(frame):
             table = table.append({'epoch':int(epoch), 'mdate': mdate, 
             'RSLC3': rslc3, 'azshift_SD': azishift_SD, 'daz_SD': daz_sd, 
             'daz_ICC': daz_icc, 'dr_ICC': dr_icc, 'epochdate': row.epoch}, ignore_index=True)
-        
-        
-        
         # get epochs 'to correct', i.e. that used old orb files, and if they were used for RSLC3:
         #tocorrectepochs = []
     O = table[table['epoch']<20200729]
