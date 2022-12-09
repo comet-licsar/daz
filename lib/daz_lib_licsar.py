@@ -373,6 +373,8 @@ def fix_oldorb_shift_oneoff_track(track=2):
     '''
     frames=os.listdir(os.path.join(os.environ['LiCSAR_procdir'], str(track)))
     for frame in frames:
+        if len(frame) != 17:
+            continue
         try:
             master = fc.get_master(frame)
         except:
@@ -383,15 +385,14 @@ def fix_oldorb_shift_oneoff_track(track=2):
             # this was day of updating orbits. everything above is OK!
             print('frame '+frame+' is ok')
             continue
-        '''
-        eofile = glob.glob(os.path.join(os.environ['LiCSAR_procdir'], track, frame, 'SLC', master, '*EOF'))[0]
-        eofile=os.path.basename(eofile)
-        eofdate = eofile.split('_')[5].split('T')[0]
-        '''
         print('processing frame '+frame)
         fix_oldorb_shift_oneoff(frame)
 
-
+'''
+        eofile = glob.glob(os.path.join(os.environ['LiCSAR_procdir'], track, frame, 'SLC', master, '*EOF'))[0]
+        eofile=os.path.basename(eofile)
+        eofdate = eofile.split('_')[5].split('T')[0]
+'''
 
 import datetime as dt
 import warnings
@@ -447,7 +448,7 @@ def fix_oldorb_shift_oneoff(frame):
             rc=shutil.move(os.path.join(lutdir,epoch+'.7z'), os.path.join(bckdir,epoch+'.7z'))
             azishift_SD = np.nan
         # now get more info from qualfile
-        rslc3 = int(master)
+        fixrslc3 = False
         qualfile = os.path.join(logdir, 'coreg_quality_{0}_{1}.log'.format(master, epoch))
         if os.path.exists(qualfile):
             try:
@@ -459,23 +460,32 @@ def fix_oldorb_shift_oneoff(frame):
             try:
                 rslc3 = grep1line('Spectral diversity estimation',qualfile).split(':')[-1]
                 if not rslc3:
-                    rslc3 = int(master)
+                    fixrslc3 = True
                 else:
                     rslc3=int(rslc3.strip())
             except:
                 print('error in qualfile to extract RSLC3 info')
-                rslc3= int(master)
+                fixrslc3 = True
         else:
             print('ERROR - coreg qual file does not exist')
             daz_icc, dr_icc, daz_sd = np.nan, np.nan, np.nan
             daz_sd = azishift_SD
+            fixrslc3 = True
+        if fixrslc3:
+            if np.abs((pd.Timestamp(master)-pd.Timestamp(epoch)).days)<180:
+                rslc3 = int(master)
+            else:
+                try:
+                    rslc3= int(mdate)
+                except:
+                    rslc3= int(master)
         if azishift_SD == np.nan:
             azishift_SD = daz_sd
         if azishift_SD != np.nan:
             table = table.append({'epoch':int(epoch), 'mdate': mdate, 'RSLC3': rslc3, 'azshift_SD': azishift_SD, 'daz_SD': daz_sd, 'daz_ICC': daz_icc, 'dr_ICC': dr_icc}, ignore_index=True)
     #
+    table['epochdate'] = table.epoch.astype(int).astype(str)
     if not table.empty:
-        table['epochdate'] = table.epoch.astype(int).astype(str)
         table['epochdate'] = table.apply(lambda x : pd.to_datetime(str(x.epochdate)).date(), axis=1)
     dazdb = get_daz_frame(frame)
     # fill non-existing
@@ -503,7 +513,11 @@ def fix_oldorb_shift_oneoff(frame):
             try:
                 mdate = int(row.orbfile.split('_')[5].split('T')[0])
             except:
-                mdate = np.nan
+                #mdate = np.nan
+                if epoch > int(master):
+                    mdate = epoch   # assumming here only - perhaps better than with nan
+                else:
+                    mdate = int(master)
             rslc3 = int(row.rslc3.strftime('%Y%m%d'))
             azishift_SD = row.daz
             daz_sd = row.daz
@@ -531,16 +545,17 @@ def fix_oldorb_shift_oneoff(frame):
             affected = table[table.RSLC3.astype(int).isin(missingrslc3s)].epoch.astype(int).values
             #possible_rslc3s = table[~table.epoch.astype(int).isin(affected)].epoch.astype(int).values
             possible_rslc3s = table[~table.epoch.astype(int).isin(affected)].epochdate #.values
-            possible_rslc3s_ord = possible_rslc3s.apply(lambda x : pd.to_datetime(str(x)).toordinal()).values
-            possible_rslc3s = table[~table.epoch.astype(int).isin(affected)].epoch.values
-            for missing in missingrslc3s:
-                agg=pd.Timestamp(str(missing)).toordinal()
-                 #.unique()
-                #possible_rslc3s = table[table.RSLC3.astype(int).isin(allepochs)].RSLC3.astype(int).unique()
-                substitute_i = np.argmin(np.abs(possible_rslc3s_ord-agg))
-                substitute = possible_rslc3s[substitute_i]
-                selec = table[table['RSLC3'].astype(int)==missing].index
-                table.loc[selec,'RSLC3'] = substitute
+            if not possible_rslc3s.empty:
+                possible_rslc3s_ord = possible_rslc3s.apply(lambda x : pd.to_datetime(str(x)).toordinal()).values
+                possible_rslc3s = table[~table.epoch.astype(int).isin(affected)].epoch.values
+                for missing in missingrslc3s:
+                    agg=pd.Timestamp(str(missing)).toordinal()
+                     #.unique()
+                    #possible_rslc3s = table[table.RSLC3.astype(int).isin(allepochs)].RSLC3.astype(int).unique()
+                    substitute_i = np.argmin(np.abs(possible_rslc3s_ord-agg))
+                    substitute = possible_rslc3s[substitute_i]
+                    selec = table[table['RSLC3'].astype(int)==missing].index
+                    table.loc[selec,'RSLC3'] = substitute
             #
     while checkit == 1:
         tocheck = table[table['RSLC3'].astype(int).astype(str).isin(tocorrectepochs)]
