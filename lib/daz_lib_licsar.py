@@ -400,7 +400,7 @@ warnings.filterwarnings("ignore")
 from LiCSquery import *
 import shutil
 
-def fix_oldorb_shift_oneoff(frame):
+def fix_oldorb_shift_oneoff(frame, tmpdir = '/work/scratch-pw3/licsar/earmla/temp3/106D_05447_131313/'):
     ''' Careful - to be run only once!
     This will modify LUT tables and coreg_quality files, so that daz will include shift due to updated orbits.
     This means: for all O and OR, shift the values by -39 mm, where O=epoch resampled using old orbits, OR=epoch that was using O as RSLC3
@@ -408,7 +408,7 @@ def fix_oldorb_shift_oneoff(frame):
     track = str(int(frame[:3]))
     framedir=os.path.join(os.environ['LiCSAR_procdir'], track, frame)
     bckdir=os.path.join(os.environ['LiCSAR_procdir'], track, frame, 'backup')
-    tmpdir = '/work/scratch-pw3/licsar/earmla/temp3/'+frame
+    tmpdir = tmpdir+frame
     if not os.path.exists(tmpdir):
         os.mkdir(tmpdir)
     master = fc.get_master(frame)
