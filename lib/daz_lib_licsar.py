@@ -379,6 +379,10 @@ def fix_oldorb_shift_oneoff_track(track=2):
             master = fc.get_master(frame)
         except:
             continue
+        if not os.path.exists(os.path.join(os.environ['LiCSAR_public'], str(track), frame)):
+            print('frame '+frame+' not properly initialized, deleting')
+            os.system('rm -rf {0}'.format(os.path.join(os.environ['LiCSAR_procdir'], str(track), frame)))
+            continue
         #masterfile = os.path.join(os.environ['LiCSAR_procdir'], track, frame, 'SLC', master, )
         #cdate_master = 
         if int(master) > 20210614:
@@ -400,7 +404,7 @@ warnings.filterwarnings("ignore")
 from LiCSquery import *
 import shutil
 
-def fix_oldorb_shift_oneoff(frame, tmpdir = '/work/scratch-pw3/licsar/earmla/temp3/106D_05447_131313/'):
+def fix_oldorb_shift_oneoff(frame, tmpdir = '/work/scratch-pw3/licsar/earmla/temp3/'):
     ''' Careful - to be run only once!
     This will modify LUT tables and coreg_quality files, so that daz will include shift due to updated orbits.
     This means: for all O and OR, shift the values by -39 mm, where O=epoch resampled using old orbits, OR=epoch that was using O as RSLC3
@@ -426,63 +430,70 @@ def fix_oldorb_shift_oneoff(frame, tmpdir = '/work/scratch-pw3/licsar/earmla/tem
     print('checking and updating')
     if not os.path.exists(lutdir):
         os.mkdir(lutdir)
-    for z in os.listdir(lutdir):
-        epoch = z.split('.')[0]
-        #if int(epoch) > 20200800:
-        #print('processing epoch '+epoch)
-        # first process the LUT file:
-        lutfile = os.path.join(lutdir,z)
-        mdate = dt.datetime.fromtimestamp(os.path.getmtime(lutfile))
-        mdate = int(mdate.strftime('%Y%m%d'))
-        #rc = os.system('cd {0}; 7za x {1} {2}/{3}_{2}.off>/dev/null'.format(tmpdir, lutfile, epoch, master))
-        #ltfile = os.path.join(tmpdir, epoch, master+'_'+epoch+'.slc.mli.lt')
-        offile = os.path.join(tmpdir, epoch, master+'_'+epoch+'.off')
-        if not os.path.exists(offile):
-            rc = os.system('cd {0}; 7za x {1} {2}/{3}_{2}.off>/dev/null'.format(tmpdir, lutfile, epoch, master))
-        if os.path.exists(offile):
-            azishift_SD = get_azshift_SD(offile)
-        else:
-            # error with LUT file, mv to bck:
-            if not os.path.exists(bckdir):
-                os.mkdir(bckdir)
-            rc=shutil.move(os.path.join(lutdir,epoch+'.7z'), os.path.join(bckdir,epoch+'.7z'))
-            azishift_SD = np.nan
-        # now get more info from qualfile
-        fixrslc3 = False
-        qualfile = os.path.join(logdir, 'coreg_quality_{0}_{1}.log'.format(master, epoch))
-        if os.path.exists(qualfile):
-            try:
-                daz_icc, dr_icc, daz_sd = get_shifts_from_qualfile(qualfile)
-            except:
-                print('Some error reading qualfile - please check this file manually: {}'.format(qualfile))
+    luts = glob.glob(lutdir+'/20??????.7z')
+    if len(luts)>0:
+        for z in [ os.path.basename(a) for a in luts ]:
+            epoch = z.split('.')[0]
+            #if int(epoch) > 20200800:
+            #print('processing epoch '+epoch)
+            # first process the LUT file:
+            lutfile = os.path.join(lutdir,z)
+            mdate = dt.datetime.fromtimestamp(os.path.getmtime(lutfile))
+            mdate = int(mdate.strftime('%Y%m%d'))
+            #rc = os.system('cd {0}; 7za x {1} {2}/{3}_{2}.off>/dev/null'.format(tmpdir, lutfile, epoch, master))
+            #ltfile = os.path.join(tmpdir, epoch, master+'_'+epoch+'.slc.mli.lt')
+            offile = os.path.join(tmpdir, epoch, master+'_'+epoch+'.off')
+            if not os.path.exists(offile):
+                rc = os.system('cd {0}; 7za x {1} {2}/{3}_{2}.off>/dev/null'.format(tmpdir, lutfile, epoch, master))
+            if os.path.exists(offile):
+                try:
+                    azishift_SD = get_azshift_SD(offile)
+                except:
+                    print('bad off file - deleting '+lutfile)
+                    rc = os.system('rm '+lutfile)
+                    azishift_SD = np.nan
+            else:
+                # error with LUT file, mv to bck:
+                if not os.path.exists(bckdir):
+                    os.mkdir(bckdir)
+                rc=shutil.move(os.path.join(lutdir,epoch+'.7z'), os.path.join(bckdir,epoch+'.7z'))
+                azishift_SD = np.nan
+            # now get more info from qualfile
+            fixrslc3 = False
+            qualfile = os.path.join(logdir, 'coreg_quality_{0}_{1}.log'.format(master, epoch))
+            if os.path.exists(qualfile):
+                try:
+                    daz_icc, dr_icc, daz_sd = get_shifts_from_qualfile(qualfile)
+                except:
+                    print('Some error reading qualfile - please check this file manually: {}'.format(qualfile))
+                    daz_icc, dr_icc, daz_sd = np.nan, np.nan, np.nan
+                    daz_sd = azishift_SD
+                try:
+                    rslc3 = grep1line('Spectral diversity estimation',qualfile).split(':')[-1]
+                    if not rslc3:
+                        fixrslc3 = True
+                    else:
+                        rslc3=int(rslc3.strip())
+                except:
+                    print('error in qualfile to extract RSLC3 info')
+                    fixrslc3 = True
+            else:
+                print('ERROR - coreg qual file does not exist')
                 daz_icc, dr_icc, daz_sd = np.nan, np.nan, np.nan
                 daz_sd = azishift_SD
-            try:
-                rslc3 = grep1line('Spectral diversity estimation',qualfile).split(':')[-1]
-                if not rslc3:
-                    fixrslc3 = True
-                else:
-                    rslc3=int(rslc3.strip())
-            except:
-                print('error in qualfile to extract RSLC3 info')
                 fixrslc3 = True
-        else:
-            print('ERROR - coreg qual file does not exist')
-            daz_icc, dr_icc, daz_sd = np.nan, np.nan, np.nan
-            daz_sd = azishift_SD
-            fixrslc3 = True
-        if fixrslc3:
-            if np.abs((pd.Timestamp(master)-pd.Timestamp(epoch)).days)<180:
-                rslc3 = int(master)
-            else:
-                try:
-                    rslc3= int(mdate)
-                except:
-                    rslc3= int(master)
-        if azishift_SD == np.nan:
-            azishift_SD = daz_sd
-        if azishift_SD != np.nan:
-            table = table.append({'epoch':int(epoch), 'mdate': mdate, 'RSLC3': rslc3, 'azshift_SD': azishift_SD, 'daz_SD': daz_sd, 'daz_ICC': daz_icc, 'dr_ICC': dr_icc}, ignore_index=True)
+            if fixrslc3:
+                if np.abs((pd.Timestamp(master)-pd.Timestamp(epoch)).days)<180:
+                    rslc3 = int(master)
+                else:
+                    try:
+                        rslc3= int(mdate)
+                    except:
+                        rslc3= int(master)
+            if azishift_SD == np.nan:
+                azishift_SD = daz_sd
+            if azishift_SD != np.nan:
+                table = table.append({'epoch':int(epoch), 'mdate': mdate, 'RSLC3': rslc3, 'azshift_SD': azishift_SD, 'daz_SD': daz_sd, 'daz_ICC': daz_icc, 'dr_ICC': dr_icc}, ignore_index=True)
     #
     table['epochdate'] = table.epoch.astype(int).astype(str)
     if not table.empty:
