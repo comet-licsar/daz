@@ -10,6 +10,38 @@ import framecare as fc
 # maybe not needed?
 from daz_lib import *
 
+
+# e.g.
+# framelist=pd.read_csv('frames.txt'); framelist=list(framelist.frame)
+def extract2txt_esds_all_frames(framelist, outfile='esds.txt'):
+    dazes=pd.DataFrame()
+    for frame in framelist:
+        try:
+            a=extract2txt_esds_frame(frame)
+            dazes=dazes.append(a)
+        except:
+            print('frame '+frame+' is empty')
+    dazes=dazes.reset_index(drop=True)
+    dazes.to_csv(outfile, index=False)
+
+
+def extract2txt_esds_frame(frame):
+    '''
+    extracts to esds txt full data for given frame, from database
+    the resultant txt file is a csv as:
+    frame,esd_master,epoch,daz_total_wrt_orbits,daz_cc_wrt_orbits,orbits_precision,version
+    '''
+    a = get_daz_frame(frame)
+    a['epoch']=a.epoch.apply(lambda x: x.strftime('%Y%m%d'))
+    a['esd_master']=a.rslc3.apply(lambda x: x.strftime('%Y%m%d'))
+    a['daz_total_wrt_orbits']=a.daz+a.cc_azi
+    a['orbits_precision'] = 'P'  # only Ps should be in database
+    a['version'] = 'm' # i forgot what this is for, but should be ok any letter (?)
+    a['frame'] = frame
+    a=a.rename(columns={'cc_azi':'daz_cc_wrt_orbits'})
+    return a[['frame','esd_master','epoch','daz_total_wrt_orbits','daz_cc_wrt_orbits','orbits_precision','version']]
+
+
 def get_daz_frame(frame):
     polyid=lq.get_frame_polyid(frame)[0][0]
     daztb = lq.do_pd_query('select * from esd where polyid={};'.format(polyid))
