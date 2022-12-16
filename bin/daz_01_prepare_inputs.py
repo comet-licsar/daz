@@ -25,7 +25,7 @@ Usage
 daz_01_prepare_inputs.py [--infra frames.txt] [--outfra frames.csv] [--inesd esds_orig.txt] [--outesd esds.txt] [--orbdiff_fix]
 
  --orbdiff_fix - would apply the 39 mm fix due to change in orbits in 2020-07-29/30
-
+               - NOTE: esds.txt are used only if orbdiff_fix is set ON
 """
 #%% Change log
 '''
@@ -110,10 +110,10 @@ def main(argv=None):
         except:
             print('unable to flag S1A/B for now, skipping')
         esds.to_csv(outdazfile, index=False)
-    else:
-        # just reload it and save - at least will check for consistency
-        esds=pd.read_csv(indazfile)
-        esds.to_csv(outdazfile, index=False)
+    #else:
+    #    # just reload it and save - at least will check for consistency
+    #    esds=pd.read_csv(indazfile)
+    #    esds.to_csv(outdazfile, index=False)
 
 
 #%% main
