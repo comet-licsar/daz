@@ -13,6 +13,9 @@ from daz_lib import *
 
 # e.g.
 # framelist=pd.read_csv('frames.txt'); framelist=list(framelist.frame)
+# where you may get frames.txt e.g. by:
+# cd $LiCSAR_procdir
+# for tr in `seq 1 175`; do for f in `ls $tr`; do m=`ls $tr/$f/SLC | head -n1`; hgtfile=$LiCSAR_public/$tr/$f/metadata/$f'.geo.hgt.tif'; ll=`gdalinfo $hgtfile | grep ^Center`; lon=`echo $ll | cut -d "," -f1 | cut -d '(' -f2`; lat=`echo $ll | cut -d ")" -f1 | cut -d ',' -f2`; echo $f","$m","$lon","$lat >> $outfr;  done;done
 def extract2txt_esds_all_frames(framelist, outfile='esds.txt'):
     dazes=pd.DataFrame()
     for frame in framelist:

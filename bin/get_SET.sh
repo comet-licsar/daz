@@ -54,9 +54,12 @@ for aline in `cat $in_frames | tail -n+2 `; do
       NE=`echo $etide | cut -d ',' -f2`
       EE=`echo $etide | cut -d ',' -f3`
       VE=`echo $etide | cut -d ',' -f4`
-      U=`python3 -c "print(("$VE")-("$VM"))"`
-      E=`python3 -c "print(("$EE")-("$EM"))"`
-      N=`python3 -c "print(("$NE")-("$NM"))"`
+      U=`echo '('$VE')-('$VM')' | bc`
+      E=`echo '('$EE')-('$EM')' | bc`
+      N=`echo '('$NE')-('$NM')' | bc`
+      #U=`python3 -c "print(("$VE")-("$VM"))"`
+      #E=`python3 -c "print(("$EE")-("$EM"))"`
+      #N=`python3 -c "print(("$NE")-("$NM"))"`
       echo $frame","$epochdate","$E","$N","$U >> $out_SET
      done
   fi
