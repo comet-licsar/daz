@@ -125,10 +125,14 @@ def df_preprepare_esds(esdsin, framespdin, firstdate = '', countlimit = 25):
     #basic fixes
     esds = esdsin.copy(deep=True)
     framespd = framespdin.copy(deep=True)
+    # this helps for nans in 'master' (causing it float)
+    framespd = framespd.dropna()
+    framespd['master']=framespd['master'].astype(int)
     esds['daz_mm'] = 0.0
     esds['daz_cc_mm'] = 0.0
     esds['years_since_beginning'] = 0.0
     framespd['count_all'] = 0
+    framespd['daz_mm_std_all'] = 0.0
     firstdatei = firstdate
     for frame, group in esds.groupby('frame'):
         if not firstdate:
@@ -150,23 +154,28 @@ def df_preprepare_esds(esdsin, framespdin, firstdate = '', countlimit = 25):
         medianvalue = group['daz_total_wrt_orbits'].median()
         group['daz_total_wrt_orbits'] = group['daz_total_wrt_orbits'] - medianvalue
         #save the median correction values to framespd
-        framespd.at[frameta.index, 'daz_median_shift_mm'] = medianvalue*azimuth_resolution*1000
-        framespd.at[frameta.index, 'count_all'] = int(count)
+        framespd.at[frameta.index[0], 'daz_median_shift_mm'] = medianvalue*azimuth_resolution*1000
+        framespd.at[frameta.index[0], 'count_all'] = int(count)
         group['daz_mm'] = group['daz_total_wrt_orbits']*azimuth_resolution*1000
         group['daz_cc_mm'] = group['daz_cc_wrt_orbits']*azimuth_resolution*1000
         group['years_since_beginning'] = group['epochdate'] - firstdatei
         group['years_since_beginning'] = group['years_since_beginning'].apply(lambda x: float(x.days)/365.25)
         #get std, after detrending - but no need to save daz_detrended_mm now....
         group['daz_detrended_mm'] = signal.detrend(group['daz_mm'])
-        framespd.at[frameta.index, 'daz_mm_std_all'] = np.std(group['daz_detrended_mm'])
+        framespd.at[frameta.index[0], 'daz_mm_std_all'] = np.std(group['daz_detrended_mm'])
         #update esds
         esds.update(group['daz_total_wrt_orbits'])
         esds.update(group['daz_mm'])
         esds.update(group['daz_cc_mm'])
         esds.update(group['years_since_beginning'])
+    # not good - the data is full of nans! quick fix - but many removed:
+    framespd=framespd.dropna()
     for frame in framespd['frame']:
         if frame not in esds['frame'].values:
             framespd = framespd.drop(framespd.loc[framespd['frame']==frame].index)
+    for frame in esds.frame.unique():
+        if frame not in framespd['frame'].values:
+            esds = esds.drop(esds.loc[esds['frame']==frame].index)
     #got those in mm, so we can remove the px values now
     esds = esds.drop('daz_total_wrt_orbits', axis=1)
     esds = esds.drop('daz_cc_wrt_orbits', axis=1)
