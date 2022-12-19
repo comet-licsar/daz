@@ -125,7 +125,7 @@ def df_preprepare_esds(esdsin, framespdin, firstdate = '', countlimit = 25):
     #basic fixes
     esds = esdsin.copy(deep=True)
     framespd = framespdin.copy(deep=True)
-    # this helps for nans in 'master' (causing it float)
+        # this helps for nans in 'master' (causing it float)
     framespd = framespd.dropna()
     framespd['master']=framespd['master'].astype(int)
     esds['daz_mm'] = 0.0
@@ -139,8 +139,11 @@ def df_preprepare_esds(esdsin, framespdin, firstdate = '', countlimit = 25):
             firstdatei = group['epochdate'].min()
         frameta = framespd[framespd['frame'] == frame]
         if frameta.empty:
-            print('Warning, frame {} not found in framespd, using defaults'.format(frame))
-            azimuth_resolution = 14.0
+            #print('Warning, frame {} not found in framespd, using defaults'.format(frame))
+            #azimuth_resolution = 14.0
+            print('Warning, frame {} not found in framespd, skipping'.format(frame))
+            esds = esds.drop(esds.loc[esds['frame']==frame].index)
+            continue
         else:
             azimuth_resolution = float(frameta['azimuth_resolution'])
         count = group.epochdate.count()
@@ -168,11 +171,12 @@ def df_preprepare_esds(esdsin, framespdin, firstdate = '', countlimit = 25):
         esds.update(group['daz_mm'])
         esds.update(group['daz_cc_mm'])
         esds.update(group['years_since_beginning'])
-    # not good - the data is full of nans! quick fix - but many removed:
+    # extra check/fix?
     framespd=framespd.dropna()
     for frame in framespd['frame']:
         if frame not in esds['frame'].values:
             framespd = framespd.drop(framespd.loc[framespd['frame']==frame].index)
+    # perhaps not necessary, but just in case..
     for frame in esds.frame.unique():
         if frame not in framespd['frame'].values:
             esds = esds.drop(esds.loc[esds['frame']==frame].index)
