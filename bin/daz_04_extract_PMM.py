@@ -10,6 +10,7 @@ Input & output files
 ===============
 Inputs :
  - frames.csv - either orig frames.csv or the one including iono columns
+[- vel_gps.nc - GPS velocities, must contain VEL_E, VEL_N variables, expected in NNR]
 
 Outputs :
  - frames_with_itrf.csv - new columns with the ITRF2014 PMM in azimuth direction
@@ -17,7 +18,9 @@ Outputs :
 =====
 Usage
 =====
-daz_04_extract_PMM.py [--infra frames.csv] [--outfra frames_with_itrf.csv]
+daz_04_extract_PMM.py [--infra frames.csv] [--outfra frames_with_itrf.csv] [--velnc vel_gps_kreemer.nc]
+
+Note: param velnc is optional, but if provided as nc file with VEL_E, VEL_N variables, it will be used as GPS velocities.
 
 """
 #%% Change log
@@ -45,11 +48,11 @@ def main(argv=None):
     #%% Set default
     inframesfile = 'frames_with_iono.csv'
     outframesfile = 'frames_with_itrf.csv'
-    
+    velnc = 'vel_gps_kreemer.nc'
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "h", ["help", "infra =", "outfra ="])
+            opts, args = getopt.getopt(argv[1:], "h", ["help", "infra=", "outfra=", "velnc="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -60,6 +63,8 @@ def main(argv=None):
                 inframesfile = a
             elif o == "--outfra":
                 outframesfile = a
+            elif o == "--velnc":
+                velnc = a
         
         if os.path.exists(outframesfile):
             raise Usage('output frames csv file already exists. Cancelling')
@@ -77,8 +82,10 @@ def main(argv=None):
     # get plate motion model
     ################### ITRF2014
     #takes again long - some 2-3 hours
-    print('getting ITRF2014 values - using the average for the 222x222 km around the frame centre')
-    framespd = df_get_itrf_slopes(framespd)
+    print('getting plate motion model values using the average for the 222x222 km around the frame centre')
+    print('(using ITRF2014 and external nc file for GPS, if available)')
+    #framespd = df_get_itrf_slopes(framespd)
+    framespd = df_get_itrf_gps_slopes(framespd, velnc=velnc)
     framespd.to_csv(outframesfile)
     print('done')
 
