@@ -8,6 +8,7 @@ from scipy.constants import pi
 from scipy import signal
 from scipy.stats import linregress
 from sklearn.linear_model import HuberRegressor
+import xarray as xr
 
 import glob, os
 
@@ -348,10 +349,6 @@ def get_itrf_gps_EN(df, samplepoints=3, velnc='vel_gps_kreemer.nc', refto='NNR',
         # use a median over 'whole' frame:
         itrfEs = []
         itrfNs = []
-        GPS_E = []
-        GPS_N = []
-        GPS_rms_E = []
-        GPS_rms_N = []
         leng=round(clon*10+23.4/2)+1-round(clon*10-23.4/2)
         for i in range(round(clon*10-23.4/2),round(clon*10+23.4/2)+1,int(leng/samplepoints)):
             lon = i/10
@@ -359,6 +356,7 @@ def get_itrf_gps_EN(df, samplepoints=3, velnc='vel_gps_kreemer.nc', refto='NNR',
                 lat = j/10
                 try:
                     itrfE, itrfN = get_ITRF_ENU(lat, lon, refto=refto)
+                    #itrfE, itrfN = 0,0 #debug
                     itrfEs.append(itrfE)
                     itrfNs.append(itrfN)
                     #itrfs.append(EN2azi(N, E, heading))
