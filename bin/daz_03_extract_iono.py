@@ -95,6 +95,24 @@ def main(argv=None):
     esds, framespd = df_preprepare_esds(esds, framespd, firstdate = '', countlimit = 25)
     print('performing the iono calculation')
     esds, framespd = extract_iono_full(esds, framespd)
+    '''
+    if not parallel:
+        esds, framespd = extract_iono_full(esds, framespd)
+    else:
+        print('through {0} parallel processes'.format(str(nproc)))
+        
+        @dask.delayed
+        def dask_extract_iono_full(esds, framespd):
+            return extract_iono_full(esds, framespd)
+        
+        for track in range(175):
+            track=track+1
+            selesds = esds.copy()
+            selframes = framespd.where().copy()
+            selesds, selframes = dask_extract_iono_full(selesds, selframes)
+            esds.update(selesds)
+            framespd.update(selframes)
+    '''
     print('saving files')
     esds.to_csv(outdazfile)
     framespd.to_csv(outframesfile)

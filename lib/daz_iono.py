@@ -48,7 +48,9 @@ def extract_iono_full(esds, framespd):
         selesds['daz_iono_grad_mm'] = daz_iono_grad*resolution*1000
         selesds['tecs_A'] = tecs_A
         selesds['tecs_B'] = tecs_B
-        selesds['daz_mm_notide_noiono_grad'] = selesds['daz_mm_notide'] - selesds['daz_iono_grad_mm'] #*resolution*1000
+        #selesds['daz_mm_notide_noiono_grad'] = selesds['daz_mm_notide'] - selesds['daz_iono_grad_mm'] #*resolution*1000
+        # keeping the negative values, as this is indeed a standard approach
+        selesds['daz_mm_notide_noiono_grad'] = selesds['daz_mm_notide'] + selesds['daz_iono_grad_mm'] #*resolution*1000
         esds.update(selesds)
         framespd.at[framespd[framespd['frame']==frame].index[0], 'Hiono'] = hiono
         framespd.at[framespd[framespd['frame']==frame].index[0], 'Hiono_std'] = hiono_std
@@ -151,7 +153,7 @@ def get_altitude(lat, lon):
     return elev
 
 
-
+'''
 def get_abs_iono_corr(frame,esds,framespd):
     selected_frame_esds = esds[esds['frame'] == frame].copy()
     frameta = framespd[framespd['frame']==frame]
@@ -169,7 +171,7 @@ def get_abs_iono_corr(frame,esds,framespd):
     #tecovl = (TECs_B1 - TEC_master_B1)/(fH*fH) - (TECs_B2 - TEC_master_B2)/(fL*fL)
     #daz_iono = -2*PRF*k*f0/c/dfDC * tecovl
     return daz_iono
-
+'''
 
 def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = False, out_tec_master = False, out_tec_all = False):
     '''
@@ -285,7 +287,10 @@ def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = Fal
         #tecovl = (selected_frame_esds['TECS_B'] - tec_B_master)/(fL*fL) - (selected_frame_esds['TECS_A'] - tec_A_master)/(fH*fH)
         #daz_iono = 2*PRF*k*f0/c/dfDC * tecovl
         # 04/2022 - actually the squares seem not needed, based directly on iono2phase (see article):
-        tecovl = (selected_frame_esds['TECS_B'] - tec_B_master)/fL - (selected_frame_esds['TECS_A'] - tec_A_master)/fH
+        # note i do opposite sign here, but this is because i ADD the u_iono to u_azi...
+        #tecovl = (selected_frame_esds['TECS_B'] - tec_B_master)/fL - (selected_frame_esds['TECS_A'] - tec_A_master)/fH
+        # ok, i shouldn't - keeping as in article then, and will change the u_azi=+u_iono to minus
+        tecovl = (selected_frame_esds['TECS_A'] - tec_A_master)/fH - (selected_frame_esds['TECS_B'] - tec_B_master)/fL
         daz_iono = 2*PRF*k/c/dfDC * tecovl
     else:
         # following the Liang 2019:

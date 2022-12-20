@@ -229,40 +229,26 @@ def get_ITRF_ENU(lat, lon, model='itrf2014', refto='NNR'):
 
 
 #get ITRF averages within the frames
-def df_get_itrf_slopes(framespd):
+def df_get_itrf_gps_slopes(framespd, velnc='vel_gps_kreemer.nc'):
+    '''
+    will get both itrf 2014 pmm and gps stations averages, converted to LOS of frames in framespd
+    '''
+    framespd = get_itrf_gps_EN(framespd, samplepoints=3, velnc=velnc, refto='NNR', rowname = 'center')
     framespd['slope_plates_vel_azi_itrf2014'] = 0.0
-    framespd['slope_plates_vel_azi_itrf2014_point'] = 0.0
+    #framespd['slope_plates_vel_azi_itrf2014_point'] = 0.0
+    if 'GPS_N' in framespd.columns:
+        framespd['slope_plates_vel_azi_gps'] = 0.0
+    print('converting to LOS')
     for ind,frameta in framespd.iterrows():
         frame = frameta['frame']
-        itrfs = []
-        print(frame)
-        clon = frameta['center_lon']
-        clat = frameta['center_lat']
         heading = frameta['heading']
-        try:
-            E, N = get_ITRF_ENU(clat, clon)
-        except:
-            try:
-                E, N = get_ITRF_ENU(clat, clon)
-            except:
-                print('error')
-                continue
-        itrf_point = EN2azi(N, E, heading)
-        # use a median over 'whole' frame:
-        for i in range(round(clon*10-23.4/2),round(clon*10+23.4/2)+1,5):
-            lon = i/10
-            for j in range(round(clat*10-23.4/2),round(clat*10+23.4/2)+1,5):
-                lat = j/10
-                try:
-                    E, N = get_ITRF_ENU(lat, lon)
-                    itrfs.append(EN2azi(N, E, heading))
-                except:
-                    print('connection error')
-        vel_plates_azi = np.mean(itrfs)
-        print('difference: '+str(vel_plates_azi - itrf_point))
-        #
-        framespd.at[ind, 'slope_plates_vel_azi_itrf2014'] = vel_plates_azi
-        framespd.at[ind, 'slope_plates_vel_azi_itrf2014_point'] = itrf_point
+        N = frameta['ITRF_N']
+        E = frameta['ITRF_E']
+        framespd.at[ind, 'slope_plates_vel_azi_itrf2014'] = EN2azi(N, E, heading)
+        if 'GPS_N' in framespd.columns:
+            N = frameta['GPS_N']
+            E = frameta['GPS_E']
+            framespd.at[ind, 'slope_plates_vel_azi_gps'] = EN2azi(N, E, heading)
     return framespd
 
 
@@ -330,23 +316,11 @@ def decompose_azi2NE(df, col = 'daz_mm_notide_noiono_grad'):
                          })
 
 
-def get_GPS_EN(lat, lon, velnc='velok.nc'):
-    '''Gets E,N velocities from external file.
-    I prepared the velok.nc file from data available in supplementary files of article:
-    Basically, I used the existing velocities and correctly georeferenced them to WGS-84 frame.
-    '''
-    if not os.path.exists(velnc):
-        print('the file with velocities does not exist, exiting')
-        return False
-    E = float(vels.sel(lon=178.5, lat=85.1, method='nearest').VEL_E.values)
-    return E,N
-
-
 # get ITRF N, E values
-def get_itrf_EN(df, samplepoints=3, velnc='velok.nc', refto='NNR'):
+def get_itrf_gps_EN(df, samplepoints=3, velnc='vel_gps_kreemer.nc', refto='NNR', rowname = 'centroid'):
     '''Gets EN velocities from ITRF2014 plate motion model (auto-extract from UNAVCO website)
-    In case velnc exists, it will be used instead of the model. I know it is bit misleading, as this is not ITRF model. Instead,
-    I prepared the velok.nc file from data available in supplementary files of article DOI:10.1002/2014GC005407
+    In case velnc exists, it will be used as well, to generate GPS_N/E.. 
+    I prepared the vel_gps_kreemer.nc file from data available in supplementary files of article DOI:10.1002/2014GC005407
     Basically, I used the existing velocities and correctly georeferenced them to WGS-84 frame.
     '''
     usevel = False
@@ -358,41 +332,59 @@ def get_itrf_EN(df, samplepoints=3, velnc='velok.nc', refto='NNR'):
     itrfs_E = []
     itrfs_rms_N = []
     itrfs_rms_E = []
+    if usevel:
+        GPS_N = []
+        GPS_E = []
+        GPS_rms_N = []
+        GPS_rms_E = []
     iii = 0
     fullcount = len(df)
     for ind, row in df.iterrows():
         iii = iii+1
         print('getting ITRF for {0}/{1} cells'.format(iii, fullcount))
-        clon = row['centroid_lon']
-        clat = row['centroid_lat']
+        clon = row[rowname+'_lon']
+        clat = row[rowname+'_lat']
+        print('extracting PMM values from ITRF2014')
         # use a median over 'whole' frame:
-        Es = []
-        Ns = []
-        for i in range(round(clon*10-23.4/2),round(clon*10+23.4/2)+1,samplepoints):
+        itrfEs = []
+        itrfNs = []
+        GPS_E = []
+        GPS_N = []
+        GPS_rms_E = []
+        GPS_rms_N = []
+        leng=round(clon*10+23.4/2)+1-round(clon*10-23.4/2)
+        for i in range(round(clon*10-23.4/2),round(clon*10+23.4/2)+1,int(leng/samplepoints)):
             lon = i/10
-            for j in range(round(clat*10-23.4/2),round(clat*10+23.4/2)+1,samplepoints):
+            for j in range(round(clat*10-23.4/2),round(clat*10+23.4/2)+1,int(leng/samplepoints)):
                 lat = j/10
-                if not usevel:
-                    try:
-                        E, N = get_ITRF_ENU(lat, lon, refto=refto)
-                        Es.append(E)
-                        Ns.append(N)
-                        #itrfs.append(EN2azi(N, E, heading))
-                    except:
-                        print('connection error')
-                else:
-                    E = float(vels.sel(lon=lon, lat=lat, method='nearest').VEL_E.values)
-                    N = float(vels.sel(lon=lon, lat=lat, method='nearest').VEL_N.values)
-                    Es.append(E)
-                    Ns.append(N)
-        itrfs_E.append(np.mean(Es))
-        itrfs_N.append(np.mean(Ns))
-        itrfs_rms_E.append(np.std(Es,ddof=1))
-        itrfs_rms_N.append(np.std(Ns,ddof=1))
+                try:
+                    itrfE, itrfN = get_ITRF_ENU(lat, lon, refto=refto)
+                    itrfEs.append(itrfE)
+                    itrfNs.append(itrfN)
+                    #itrfs.append(EN2azi(N, E, heading))
+                except:
+                    print('connection error')
+        if usevel:
+            print('extracting PMM values from GPS stations')
+            gps1_E = vels.sel(lon=slice(clon-125/111, clon+125/111), lat=slice(clat-125/111, clat+125/111)).VEL_E #.values
+            gps1_N = vels.sel(lon=slice(clon-125/111, clon+125/111), lat=slice(clat-125/111, clat+125/111)).VEL_N #.values
+            GPS_E.append(float(gps1_E.mean()))
+            GPS_N.append(float(gps1_N.mean()))
+            GPS_rms_E.append(float(gps1_E.std(ddof=1)))
+            GPS_rms_N.append(float(gps1_N.std(ddof=1)))
+        itrfs_E.append(np.mean(itrfEs))
+        itrfs_N.append(np.mean(itrfNs))
+        itrfs_rms_E.append(np.std(itrfEs,ddof=1))
+        itrfs_rms_N.append(np.std(itrfNs,ddof=1))
     df['ITRF_N'] = itrfs_N
     df['ITRF_E'] = itrfs_E
     df['ITRF_RMSE_E'] = itrfs_rms_E
     df['ITRF_RMSE_N'] = itrfs_rms_N
+    if usevel:
+        df['GPS_N'] = GPS_N
+        df['GPS_E'] = GPS_E
+        df['GPS_RMSE_E'] = GPS_rms_E
+        df['GPS_RMSE_N'] = GPS_rms_N
     return df
     
 
