@@ -384,8 +384,11 @@ def get_itrf_gps_EN(df, samplepoints=3, velnc='vel_gps_kreemer.nc', refto='NNR',
         df['GPS_RMSE_E'] = GPS_rms_E
         df['GPS_RMSE_N'] = GPS_rms_N
     return df
-    
 
+
+def get_std_diff(diff):
+    suma = np.sum(diff**2) #diff
+    return np.sqrt(suma/len(diff))
 
 
 def decompose_framespd(framespd, cell_size = 2.25, crs = "EPSG:4326"):
