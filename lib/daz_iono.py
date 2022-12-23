@@ -48,8 +48,6 @@ def extract_iono_full(esds, framespd):
         selesds['daz_iono_grad_mm'] = daz_iono_grad*resolution*1000
         selesds['tecs_A'] = tecs_A
         selesds['tecs_B'] = tecs_B
-        #selesds['daz_mm_notide_noiono_grad'] = selesds['daz_mm_notide'] - selesds['daz_iono_grad_mm'] #*resolution*1000
-        # keeping the negative values, as this is indeed a standard approach
         selesds['daz_mm_notide_noiono_grad'] = selesds['daz_mm_notide'] + selesds['daz_iono_grad_mm'] #*resolution*1000
         esds.update(selesds)
         framespd.at[framespd[framespd['frame']==frame].index[0], 'Hiono'] = hiono
@@ -189,6 +187,9 @@ def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = Fal
     inc_angle_avg = frameta['avg_incidence_angle'].values[0]
     center_time=frameta['centre_time'].values[0]
     dfDC = frameta['dfDC'].values[0]
+    if dfDC == 0:
+        print('warning, frame '+frame+' has no info on dfDC, using default')
+        dfDC = 4365 #Hz, mean value in the whole dataset
     #a bit recalculate
     theta = np.radians(inc_angle_avg)
     #sathei = int(range_avg * np.cos(theta)/1000) #in km --- will do this better
@@ -288,9 +289,7 @@ def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = Fal
         #daz_iono = 2*PRF*k*f0/c/dfDC * tecovl
         # 04/2022 - actually the squares seem not needed, based directly on iono2phase (see article):
         # note i do opposite sign here, but this is because i ADD the u_iono to u_azi...
-        #tecovl = (selected_frame_esds['TECS_B'] - tec_B_master)/fL - (selected_frame_esds['TECS_A'] - tec_A_master)/fH
-        # ok, i shouldn't - keeping as in article then, and will change the u_azi=+u_iono to minus
-        tecovl = (selected_frame_esds['TECS_A'] - tec_A_master)/fH - (selected_frame_esds['TECS_B'] - tec_B_master)/fL
+        tecovl = (selected_frame_esds['TECS_B'] - tec_B_master)/fL - (selected_frame_esds['TECS_A'] - tec_A_master)/fH
         daz_iono = 2*PRF*k/c/dfDC * tecovl
     else:
         # following the Liang 2019:

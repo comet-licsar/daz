@@ -87,6 +87,7 @@ def fit_huber(x, y, alpha = 1, epsilon=1.2, outinyears = True):
 
 def df_calculate_slopes(esdsin, framespdin, alpha = 2.5, eps = 1.5, bycol = 'daz_mm_notide', subset = True, roll_assist = False):
     esds = esdsin.copy(deep=True)
+    esds = esds.dropna()
     framespd = framespdin.copy(deep=True)
     #must start with True to initialise all 'as outliers'
     esds['is_outlier_'+bycol] = True
@@ -104,6 +105,7 @@ def df_calculate_slopes(esdsin, framespdin, alpha = 2.5, eps = 1.5, bycol = 'daz
             continue
         # make preselection
         grsel = group.copy(deep=True)
+        grsel = grsel[np.isfinite(grsel[bycol])]
         # get the full dataset, as we will filter it further on
         #limiting the dataset here, as data after 2020-07-30 have way different PODs (v. 1.7)
         #grsel = grsel[grsel['epochdate'] < pd.Timestamp('2020-07-30')] 
@@ -206,3 +208,8 @@ def df_calculate_slopes(esdsin, framespdin, alpha = 2.5, eps = 1.5, bycol = 'daz
         esds.update(grsel['is_outlier_'+bycol])
     return esds, framespd
 
+'''
+for col in ['daz_mm_notide', 'daz_mm_notide_noiono_grad']:
+     print('estimating velocities of '+col)
+     esds, framespd = df_calculate_slopes(esds, framespd, alpha = 1, eps = 1.35, bycol = col, subset = False, roll_assist = roll_assist)
+'''

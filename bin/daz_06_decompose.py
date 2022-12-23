@@ -17,7 +17,9 @@ Outputs :
 =====
 Usage
 =====
-daz_06_decompose.py [--infra frames_final.csv] [--outdec decomposed.csv]
+daz_06_decompose.py [--infra frames_final.csv] [--outdec decomposed.csv] [--velnc vel_gps_kreemer.nc]
+
+Note: param velnc is optional, but if provided as nc file with VEL_E, VEL_N variables, it will be used as GPS velocities.
 
 """
 #%% Change log
@@ -48,10 +50,11 @@ def main(argv=None):
     #%% Set default
     inframesfile = 'frames_final.csv'
     outdecfile = 'decomposed.csv'
+    velnc='vel_gps_kreemer.nc'
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "h", ["help", "infra =", "outdec ="])
+            opts, args = getopt.getopt(argv[1:], "h", ["help", "infra=", "outdec=", "velnc="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -62,7 +65,8 @@ def main(argv=None):
                 inframesfile = a
             elif o == "--outdec":
                 outdecfile = a
-        
+            elif o == "--velnc":
+                velnc = a
         if os.path.exists(outdecfile):
             raise Usage('output decomposition file already exists. Cancelling')
         if not os.path.exists(inframesfile):
@@ -79,8 +83,8 @@ def main(argv=None):
     print('decomposing frames')
     gridagg = decompose_framespd(framespd)
     print('getting ITRF 2014 PMM for new cells')
-    gridagg = get_itrf_EN(gridagg)
-    
+    #gridagg = get_itrf_EN(gridagg)
+    gridagg = get_itrf_gps_EN(gridagg, samplepoints=3, velnc=velnc, refto='NNR', rowname = 'centroid')
     print('exporting final decomposed data to '+outdecfile)
     gridagg.to_csv(outdecfile)
     print('done')

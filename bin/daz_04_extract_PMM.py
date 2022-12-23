@@ -94,4 +94,8 @@ if __name__ == "__main__":
     sys.exit(main())
 
 
-
+'''
+some notes that might be relevant:
+gridagg['GPS_N_2014_EU'] = gridagg['GPS_N'] - gridagg['ITRF_N_2008'] + gridagg['ITRF_2014_EU_N']
+gridagg['GPS_E_2014_EU'] = gridagg['GPS_E'] - gridagg['ITRF_E_2008'] + gridagg['ITRF_2014_EU_E']
+'''

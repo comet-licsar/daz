@@ -202,6 +202,7 @@ def generate_framespd(fname = 'esds2021_frames.txt', outcsv = 'framespd_2021.csv
     a['ka']=0.00
     #a['kr']=0.00
     a['dfDC'] = 0.00
+    a['avg_height'] = 0.00
     for i,row in a.iterrows():
         frame=row['frame']
         #print(frame)
@@ -242,6 +243,11 @@ def generate_framespd(fname = 'esds2021_frames.txt', outcsv = 'framespd_2021.csv
             dfDC = 0
             ka = 0
             #kr = 0
+        try:
+            hei = grep1line('avg_height',metafile).split('=')[1]
+        except:
+            print('no height information, returning 0 for frame '+frame)
+            hei = 0
         a.at[i,'heading'] = heading
         a.at[i,'azimuth_resolution']  = azimuth_resolution
         a.at[i,'avg_incidence_angle']  = avg_incidence_angle
@@ -250,9 +256,38 @@ def generate_framespd(fname = 'esds2021_frames.txt', outcsv = 'framespd_2021.csv
     #    a.at[i,'kt']  = kt
         a.at[i,'dfDC']  = dfDC
         a.at[i,'ka']  = ka
+        a.at[i,'avg_height'] = hei
         #a.at[i,'kr']  = kr
     a = extract_frame_master_s1abs(a)
     a.to_csv(outcsv, float_format='%.4f', index=False)
+
+
+
+def get_avg_height(frame):
+    tr = int(frame[:3])
+    metafile = os.path.join(os.environ['LiCSAR_public'], str(tr), frame, 'metadata', 'metadata.txt')
+    if not os.path.exists(metafile):
+        print('metadata file does not exist for frame '+frame)
+        return np.nan
+    try:
+        hei = grep1line('avg_height=',metafile).split('=')[1]
+    except:
+        print('no info on height for frame '+frame)
+        return np.nan
+    return hei
+
+
+def get_avg_height_framespd(framespd):
+    aaa = []
+    for i,r in framespd.iterrows():
+        frame=r['frame']
+        try:
+            val=float(get_avg_height(frame))
+        except:
+            val = np.nan
+        aaa.append(val)
+    framespd['avg_height'] = aaa
+    return framespd
 
 
 def get_dfDC(path_to_slcdir, f0=5405000500, burst_interval = 2.758277, returnka = True, returnperswath = False):
