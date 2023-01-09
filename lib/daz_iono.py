@@ -288,8 +288,8 @@ def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = Fal
         #tecovl = (selected_frame_esds['TECS_B'] - tec_B_master)/(fL*fL) - (selected_frame_esds['TECS_A'] - tec_A_master)/(fH*fH)
         #daz_iono = 2*PRF*k*f0/c/dfDC * tecovl
         # 04/2022 - actually the squares seem not needed, based directly on iono2phase (see article):
-        # note i do opposite sign here, but this is because i ADD the u_iono to u_azi...
-        tecovl = (selected_frame_esds['TECS_A'] - tec_A_master)/fH - (selected_frame_esds['TECS_B'] - tec_B_master)/fL
+        # note it is 'master' minus 'epoch S', since i start from ifg as M * complex conjugate of S (so basically phase M - phase S, phase is negative for higher delay)
+        tecovl = (tec_A_master - selected_frame_esds['TECS_A'])/fH - (tec_B_master - selected_frame_esds['TECS_B'])/fL
         daz_iono = 2*PRF*k/c/dfDC * tecovl
     else:
         # following the Liang 2019:
