@@ -322,7 +322,8 @@ def get_itrf_gps_EN(df, samplepoints=3, velnc='vel_gps_kreemer.nc', refto='NNR',
     '''Gets EN velocities from ITRF2014 plate motion model (auto-extract from UNAVCO website)
     In case velnc exists, it will be used as well, to generate GPS_N/E.. 
     I prepared the vel_gps_kreemer.nc file from data available in supplementary files of article DOI:10.1002/2014GC005407
-    Basically, I used the existing velocities and correctly georeferenced them to WGS-84 frame.
+    i.e. from ggge20572-sup-0015-suppinfofig14.Z : vel_1deg_NNR.gmt
+    Basically, I used the existing velocities and correctly georeferenced them to WGS-84 frame, stored as 1 deg grid in NetCDF
     '''
     usevel = False
     if os.path.exists(velnc):

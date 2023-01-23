@@ -111,8 +111,8 @@ def df_calculate_slopes(esdsin, framespdin, alpha = 2.5, eps = 1.5, bycol = 'daz
         #grsel = grsel[grsel['epochdate'] < pd.Timestamp('2020-07-30')] 
         # 2021-10-12 - finally corrected, probably, using daz_ARP - so using full dataset now!!!
         if subset:
-            #limiting the dataset here, as often pre-2016 data are influenced by ionosphere (probably)
-            grsel = grsel[grsel['epochdate'] > pd.Timestamp('2016-01-01')]  #[grsel['epoch'] < 20200601]
+            #limiting the dataset here, as often data before mid-2016 are influenced by ionosphere (probably)
+            grsel = grsel[grsel['epochdate'] > pd.Timestamp('2016-07-01')]  #[grsel['epoch'] < 20200601]
         if len(grsel) < 20:
             print('most of data removed - cancelling for this frame')
             continue
@@ -142,7 +142,10 @@ def df_calculate_slopes(esdsin, framespdin, alpha = 2.5, eps = 1.5, bycol = 'daz
             X2 = x2.values.reshape(len(x2),1)
         # prepare first iteration to huber (warm start) using itrf slope
         #print(frameta)
-        itrfslope = frameta.slope_plates_vel_azi_itrf2014.values[0]
+        colwarm = 'slope_plates_vel_azi_gps'
+        if not colwarm in frameta:
+            colwarm = 'slope_plates_vel_azi_itrf2014'
+        itrfslope = frameta[colwarm].values[0]
         itrfintercept = np.mean(x)*itrfslope * -1 #+ np.median(y)
         xitrf = np.arange(-5,5)
         yitrf = xitrf * itrfslope + itrfintercept
