@@ -35,6 +35,23 @@ def model_filter(A, y, limrms=3, iters=2):
 
 
 def get_stdvel(rmse, tmatrix):
+    """ Gets standard deviation of velocity by error propagation theory.
+    
+    Args:
+        rmse (np.array or float): rmse (or std) of the solution (or of each measurement - better)
+        tmatrix (np.array): transposed matrix of samples (time)
+    
+    Note: written when not fully understanding this..
+    rmse should be of each measurement. Also, better to also include reduced chi-squared statistic Chi^2 that is
+    r ... residuals between dependent variable and predicted value
+    S = np.transpose(r) * W * r
+    Chi^2 = S / (n-ddof)
+    or we can write that:
+    Chi^2 = np.sum((y-y_i)^2/variance) / (n-ddof)
+    
+    And for further studies: just see https://en.wikipedia.org/wiki/Reduced_chi-squared_statistic
+    so chi^2 ~ 1 means appropriate fit
+    """
     count = tmatrix.shape[0]
     #add column of ones to the tmatrix:
     cones = np.ones(tmatrix.shape)
@@ -44,7 +61,7 @@ def get_stdvel(rmse, tmatrix):
     Qd = np.zeros((count,count)) #,len(d)))
     np.fill_diagonal(Qd,1/rmse**2)
     #
-    # do Qm = (G.T Qd^-1 G)^-1  ---- Qm = [var_vel, var_intercept]
+    # do Qm = (G.T Qd^-1 G)^-1  ---- Qm = [var_vel, var_intercept] (if m = [vel, intercept])
     Qm = np.linalg.inv(A.transpose() @ Qd @ A)
     var_vel = Qm.diagonal()[0]
     #var_intercept = Qm.diagonal()[1]
