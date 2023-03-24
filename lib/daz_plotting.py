@@ -10,6 +10,14 @@ hv.extension('bokeh')
 import simplekml
 
 
+def plot_esds_from_pd(esds):
+    """ will quickly plot esds taken by e.g. dazes=daz_lib_licsar.get_daz_frame(frame)
+    """
+    if 'epochdate' not in esds:
+        esds['epochdate'] = esds.apply(lambda x : pd.to_datetime(str(x.epoch)).date(), axis=1)
+    (esds.set_index(esds.epochdate).daz*14000).plot()
+
+
 def plot_vel_esd(frame_esds, frameta, level1 = 'iono_grad', level2 = None, showitrf=True):
     # level1: 'tide', 'orig', 'iono_grad', 'iono_f2'
     global mindate
