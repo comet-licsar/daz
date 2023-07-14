@@ -64,29 +64,117 @@ def extract_iono_full(esds, framespd):
 # step 3 - get daz iono
 ################### IONOSPHERE 
 
-def get_tecs(glat, glon, altitude, acq_times, returnhei = False, source='iri'):
+def get_tecs(glat, glon, altitude, acq_times, returnhei = False, source='iri', alpha = 0.85):
     '''Gets estimated TEC over given point, up to given altitude
 
     Args:
-        glat, glon, altitude: coordinates and max 'iono height' to get the TEC values for
-        acq_times: list of .... to get the TEC over the given point
+        glat, glon, altitude: coordinates and max 'iono height' to get the TEC values for. Altitude is in km
+        acq_times (list of dt.datetime): time stamps to get the TEC over the given point
         returnhei (boolean):  if True, it would return TEC values but also estimated F2 peak heights (from IRI)
         source (str): source of TEC - either 'iri' for IRI2016 model (must be installed), or 'code' to autodownload from CODE
+        alpha (float): for CODE only, estimate of ratio of TEC towards 'to the satellite only'
     '''
+    if returnhei and source == 'code':
+        print('WARNING, height is estimated only through IRI model, now setting to it')
+        source = 'iri'
     altkmrange = [0, altitude, altitude]
     TECs = []
     heis = []
     for acqtime in acq_times:
-        iri_acq = iri2016.IRI(acqtime, altkmrange, glat, glon )
-        TECs.append(iri_acq.TEC.values[0])
-        heis.append(iri_acq.hmF2.values[0])
+        if source == 'iri':
+            iri_acq = iri2016.IRI(acqtime, altkmrange, glat, glon )
+            TECs.append(iri_acq.TEC.values[0])
+            heis.append(iri_acq.hmF2.values[0])
+        elif source == 'code':
+            tec = get_vtec_from_code(acqtime, glat, glon)
+            # decrease the value by some alpha... we expect alpha % of TEC being below the satellite.. should be improved
+            #alpha = 0.85
+            tec = alpha*tec
+            TECs.append(tec)
     if returnhei:
         return TECs, heis
     else:
         return TECs
 
+try:
+    import wget
+    #import zlib
+    from LiCSAR_misc import grep1line
+except:
+    print('error loading some library, use of CODE will fail')
+
+
+def get_vtec_from_code(acqtime, lat, lon, storedir = '/gws/nopw/j04/nceo_geohazards_vol1/code_iono'):
+    '''adapted from Reza Bordbari script, plus using functions from https://notebook.community/daniestevez/jupyter_notebooks/IONEX
+    '''
+    #D = acqtime.strftime('%Y%m%d')
+    #ipp = np.array([lat,lon])
+    filename = 'CODG' + acqtime.strftime('%j') + '0.' + acqtime.strftime('%y')+ 'I.Z'
+    url = 'http://ftp.aiub.unibe.ch/CODE/' + acqtime.strftime('%Y') + '/' + filename
+    fullpath = os.path.join(storedir,filename)
+    if not os.path.exists(fullpath):
+        # download this
+        wget.download(url, out=storedir)
+    ionix = filename[:-2]
+    if not os.path.exists(ionix):
+        rc = os.system('7za x '+fullpath+' >/dev/null 2>/dev/null')
+    if not os.path.exists(ionix):
+        print('ERROR: maybe you do not have 7za installed')
+        return False
+    # prep 
+    #hhmmss=acqtime.strftime('%H%M%S')
+    # loading the TEC maps, thanks to https://notebook.community/daniestevez/jupyter_notebooks/IONEX (but improved towards xarray by ML B-)
+    tecmaps = get_tecmaps(ionix)
+    interval = int(grep1line('INTERVAL',ionix).split()[0])
+    timestep = interval/3600
+    timecoords = np.arange(0.0,24.0+timestep,timestep)  # we expect start/end time being midnight, should be standard for all CODE files?
+    lat_all = np.arange(87.5,-87.5-2.5,-2.5)
+    lon_all = np.arange(-180.0,180.0+5,5.0)
+    tecxr = xr.DataArray(data=tecmaps, dims=['time','lat','lon'],
+                        coords=dict(time=timecoords, lon=lon_all, lat=lat_all) )
+    #try:
+    #    object1 = open(fullpath, 'rb').read()
+    #    ionix = zlib.decompress(object1)  # does not work!!!
+    
+    h_time = float(acqtime.strftime('%H'))
+    m_time = float(acqtime.strftime('%M'))
+    s_time = float(acqtime.strftime('%S'))
+    # given time in decimal format
+    time_dec = h_time + (m_time/60) + (s_time / 3600)
+    #
+    tec = float(tecxr.interp(time=time_dec, lon=lon,lat=lat, method='cubic')) # should be better than linear, but maybe quadratic is more suitable?
+    # the EXPONENT is -1 in CODE, so hardcoding this -> output will be *10^16
+    return tec*1e+16
+
+
+import re
+
+def parse_map(tecmap, exponent = -1):
+    tecmap = re.split('.*END OF TEC MAP', tecmap)[0]
+    return np.stack([np.fromstring(l, sep=' ') for l in re.split('.*LAT/LON1/LON2/DLON/H\\n',tecmap)[1:]])*10**exponent
+
+
+def get_tecmaps(filename):
+    exponent = int(grep1line('EXPONENT',ionix).split()[0]) # this is exponent of the data
+    correction_exponent = exponent * -1 # this is how to change to TECU
+    with open(filename) as f:
+        ionex = f.read()
+        return [parse_map(t, correction_exponent) for t in ionex.split('START OF TEC MAP')[1:]]
+
+
+def get_tec(tecmap, lat, lon):
+    i = round((87.5 - lat)*(tecmap.shape[0]-1)/(2*87.5))
+    j = round((180 + lon)*(tecmap.shape[1]-1)/360)
+    return tecmap[i,j]
+
+
+
+
+
+
 
 '''
+    
 def get_vtec_from_code(yyyymmdd = None,day_of_year = None,hhmmss = None,ipp_lat = None,ipp_lon = None): 
     ipp = np.array([ipp_lat,ipp_lon])
     D = num2str(yyyymmdd)
@@ -171,6 +259,8 @@ def get_vtec_from_code(yyyymmdd = None,day_of_year = None,hhmmss = None,ipp_lat 
     return vTec# Reza Bordbari
 # This script selects the appropriate latitude block in the Rinex file
 
+'''
+
 def get_lat_block(IONEXFile = None,fullDate = None,time_dec = None,time_sort = None,lat_sort = None): 
     fullDate1 = fullDate
     if time_dec > 23:
@@ -191,7 +281,6 @@ def get_lat_block(IONEXFile = None,fullDate = None,time_dec = None,time_sort = N
         if not (len(e1)==0) :
             condition = 1
             while condition == 1:
-
                 # lat one
                 l1 = strfind(tline,np.array([num2str(lat_sort(1),'%.1f'),'-180.0 180.0   5.0 450.0']))
                 if not (len(l1)==0) :
@@ -210,13 +299,11 @@ def get_lat_block(IONEXFile = None,fullDate = None,time_dec = None,time_sort = N
                         b = append(b,fgetl(DataFile))
                     latBlock2_t1 = str2num(b)
                     condition = 2
-
         # epoch two
         e2 = strfind(tline,np.array([num2str(transpose(np.array([[fullDate2],[time_sort(2)],[0],[0]]))),'                        ','EPOCH OF CURRENT MAP']))
         if not (len(e2)==0) :
             condition = 1
             while condition == 1:
-
                 # lat one
                 l1 = strfind(tline,np.array([num2str(lat_sort(1),'%.1f'),'-180.0 180.0   5.0 450.0']))
                 if not (len(l1)==0) :
@@ -236,12 +323,10 @@ def get_lat_block(IONEXFile = None,fullDate = None,time_dec = None,time_sort = N
                         b = append(b,fgetl(DataFile))
                     latBlock2_t2 = str2num(b)
                     condition = 2
-
             break
         tline = fgetl(DataFile)
-    
     return latBlock1_t1,latBlock2_t1,latBlock1_t2,latBlock2_t2
-'''
+
 
 #get satellite position - ECEF
 def aer2ecef(azimuthDeg, elevationDeg, slantRange, obs_lat, obs_long, obs_alt):
