@@ -108,7 +108,7 @@ except:
     print('error loading some library, use of CODE will fail')
 
 
-def get_vtec_from_code(acqtime, lat, lon, storedir = '/gws/nopw/j04/nceo_geohazards_vol1/code_iono'):
+def get_vtec_from_code(acqtime, lat, lon, storedir = '/gws/nopw/j04/nceo_geohazards_vol1/code_iono', return_fullxr = False):
     '''adapted from Reza Bordbari script, plus using functions from https://notebook.community/daniestevez/jupyter_notebooks/IONEX
     '''
     #D = acqtime.strftime('%Y%m%d')
@@ -119,9 +119,12 @@ def get_vtec_from_code(acqtime, lat, lon, storedir = '/gws/nopw/j04/nceo_geohaza
     if not os.path.exists(fullpath):
         # download this
         wget.download(url, out=storedir)
-    ionix = filename[:-2]
+    ionix = fullpath[:-2]
+    #try:
+        #    object1 = open(fullpath, 'rb').read()
+        #    ionix = zlib.decompress(object1)  # does not work!!!
     if not os.path.exists(ionix):
-        rc = os.system('7za x '+fullpath+' >/dev/null 2>/dev/null')
+        rc = os.system('cd '+storedir+'; 7za x '+filename+' >/dev/null 2>/dev/null')
     if not os.path.exists(ionix):
         print('ERROR: maybe you do not have 7za installed')
         return False
@@ -136,19 +139,19 @@ def get_vtec_from_code(acqtime, lat, lon, storedir = '/gws/nopw/j04/nceo_geohaza
     lon_all = np.arange(-180.0,180.0+5,5.0)
     tecxr = xr.DataArray(data=tecmaps, dims=['time','lat','lon'],
                         coords=dict(time=timecoords, lon=lon_all, lat=lat_all) )
-    #try:
-    #    object1 = open(fullpath, 'rb').read()
-    #    ionix = zlib.decompress(object1)  # does not work!!!
-    
-    h_time = float(acqtime.strftime('%H'))
-    m_time = float(acqtime.strftime('%M'))
-    s_time = float(acqtime.strftime('%S'))
-    # given time in decimal format
-    time_dec = h_time + (m_time/60) + (s_time / 3600)
-    #
-    tec = float(tecxr.interp(time=time_dec, lon=lon,lat=lat, method='cubic')) # should be better than linear, but maybe quadratic is more suitable?
-    # the EXPONENT is -1 in CODE, so hardcoding this -> output will be *10^16
-    return tec*1e+16
+    tecxr = tecxr*1e+16 # from TECU
+    if return_fullxr:
+        return tecxr
+    else:
+        # return interpolated for the given lonlat
+        h_time = float(acqtime.strftime('%H'))
+        m_time = float(acqtime.strftime('%M'))
+        s_time = float(acqtime.strftime('%S'))
+        # given time in decimal format
+        time_dec = h_time + (m_time/60) + (s_time / 3600)
+        #
+        tec = float(tecxr.interp(time=time_dec, lon=lon,lat=lat, method='cubic')) # should be better than linear, but maybe quadratic is more suitable?
+        return tec
 
 
 import re
