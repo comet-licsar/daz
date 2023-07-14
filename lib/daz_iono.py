@@ -13,6 +13,7 @@ except:
 import nvector as nv
 import iri2016
 import pyproj
+import numpy as np
 
 
 
@@ -63,9 +64,14 @@ def extract_iono_full(esds, framespd):
 # step 3 - get daz iono
 ################### IONOSPHERE 
 
-def get_tecs(glat, glon, altitude, acq_times, returnhei = False):
-    '''
-    here, the altitude is the satellite altitude (max iono height) to check...
+def get_tecs(glat, glon, altitude, acq_times, returnhei = False, source='iri'):
+    '''Gets estimated TEC over given point, up to given altitude
+
+    Args:
+        glat, glon, altitude: coordinates and max 'iono height' to get the TEC values for
+        acq_times: list of .... to get the TEC over the given point
+        returnhei (boolean):  if True, it would return TEC values but also estimated F2 peak heights (from IRI)
+        source (str): source of TEC - either 'iri' for IRI2016 model (must be installed), or 'code' to autodownload from CODE
     '''
     altkmrange = [0, altitude, altitude]
     TECs = []
@@ -79,6 +85,163 @@ def get_tecs(glat, glon, altitude, acq_times, returnhei = False):
     else:
         return TECs
 
+
+'''
+def get_vtec_from_code(yyyymmdd = None,day_of_year = None,hhmmss = None,ipp_lat = None,ipp_lon = None): 
+    ipp = np.array([ipp_lat,ipp_lon])
+    D = num2str(yyyymmdd)
+    fullDate = np.array([[str2double(D(np.arange(1,4+1)))],[str2double(D(np.arange(5,6+1)))],[str2double(D(np.arange(7,8+1)))]])
+    url = 'http://ftp.aiub.unibe.ch/CODE/' + string(fullDate(1)) + '/' + 'CODG' + string(day_of_year * 10) + '.' + D(np.arange(3,4+1)) + 'I.Z'
+    code_zip = 'CODG' + string(day_of_year * 10) + '.' + D(np.arange(3,4+1)) + 'I.Z'
+    ionix = 'CODG' + string(day_of_year * 10) + '.' + D(np.arange(3,4+1)) + 'I'
+    try:
+        zipFile = websave(code_zip,url)
+        # the URL was found if you get here.  If not, it goes to the catch.
+        print('SUCCESS: Downloaded %s to %s \n' % (url,zipFile))
+        command = sprintf('uncompress %s',code_zip)
+        system(command)
+    finally:
+        pass
+    
+    # Data acquisition time
+    T = num2str(hhmmss)
+    h_time = str2double(T(np.arange(1,2+1)))
+    m_time = str2double(T(np.arange(3,4+1)))
+    s_time = str2double(T(np.arange(5,6+1)))
+    # given time in decimal format
+    min_temp = m_time / 60
+    time_dec = h_time + min_temp + (s_time / 3600)
+    time_sec = (h_time * 3600) + (m_time * 60) + s_time
+    # all the grid points for time
+    time_all = np.arange(0,24+1,1)
+    # find the 2 closest time indices
+    time_sort = np.array([h_time,h_time + 1])
+    # longitude modification
+    we = 360 / (24 * 60 * 60)
+    
+    lon_ipp_1 = ipp(2) + (time_sec - (time_sort(1) * 3600)) * we
+    lon_ipp_2 = ipp(2) + (time_sec - (time_sort(2) * 3600)) * we
+    ## (3) Time and coordinate interpolation
+# (3-1) Find indices of the two adjacent TEC maps in latitude
+# find coordinates (lat,lon) of the all grid points
+    lat_all = np.arange(87.5,- 87.5+- 2.5,- 2.5)
+    # find the 2 closest latitude indices
+    __,ind_lat = __builtint__.sorted(np.abs(ipp(1) - lat_all),'ascend')
+    ind_lat_int = __builtint__.sorted(ind_lat(np.arange(1,2+1)),'ascend')
+    # (3-2) Reading IONEX file
+    lat_sort,iLat = __builtint__.sorted(lat_all(ind_lat_int),'descend')
+    # title of the Global IONEX file (ex. http://ftp.aiub.unibe.ch/CODE/2020/)
+    IONEXFile = ionix
+    latBlock1_t1,latBlock2_t1,latBlock1_t2,latBlock2_t2 = get_lat_block(IONEXFile,fullDate,time_dec,time_sort,lat_sort)
+    # (3-3) Bilinear interpolation (interpolation in lat, long, time)
+# theory is based on: https://www.omnicalculator.com/math/bilinear-interpolation
+    
+    lon_all = np.arange(- 180,180+5,5)
+    # epoch one
+# find the 2 closest longitude indices (based on the 1st modified IPP longitude)
+    __,ind_lon = __builtint__.sorted(np.abs(lon_ipp_1 - lon_all),'ascend')
+    ind_lon_int = __builtint__.sorted(ind_lon(np.arange(1,2+1)),'ascend')
+    lon_sort,iLon = __builtint__.sorted(lon_all(ind_lon_int),'ascend')
+    # interpolation coefficients
+    ylat = np.array([[lat_sort(1) - ipp(1)],[ipp(1) - lat_sort(2)]])
+    xlon = np.array([lon_sort(2) - lon_ipp_1,lon_ipp_1 - lon_sort(1)])
+    r = 1 / ((lon_sort(2) - lon_sort(1)) * (lat_sort(1) - lat_sort(2)))
+    # vTEC values
+    Q1 = np.array([latBlock2_t1(ind_lon_int(iLon(1))),latBlock1_t1(ind_lon_int(iLon(1))),latBlock2_t1(ind_lon_int(iLon(2))),latBlock1_t1(ind_lon_int(iLon(2)))])
+    # interpolated vTEC for epoch one
+    vTec_t1 = r * xlon * Q1 * ylat
+    clear('ylat','xlon','ind_lon','ind_lon_int','lon_sort','iLon')
+    # epoch two
+# find the 2 closest longitude indices (based on the 2nd modified IPP longitude)
+    __,ind_lon = __builtint__.sorted(np.abs(lon_ipp_2 - lon_all),'ascend')
+    ind_lon_int = __builtint__.sorted(ind_lon(np.arange(1,2+1)),'ascend')
+    lon_sort,iLon = __builtint__.sorted(lon_all(ind_lon_int),'ascend')
+    # interpolation coefficients
+    ylat = np.array([[lat_sort(1) - ipp(1)],[ipp(1) - lat_sort(2)]])
+    xlon = np.array([lon_sort(2) - lon_ipp_2,lon_ipp_2 - lon_sort(1)])
+    r = 1 / ((lon_sort(2) - lon_sort(1)) * (lat_sort(1) - lat_sort(2)))
+    # vTEC values
+    Q2 = np.array([latBlock2_t2(ind_lon_int(iLon(1))),latBlock1_t2(ind_lon_int(iLon(1))),latBlock2_t2(ind_lon_int(iLon(2))),latBlock1_t2(ind_lon_int(iLon(2)))])
+    # interpolated vTEC for epoch two
+    vTec_t2 = r * xlon * Q2 * ylat
+    # interpolation in time
+    vTec = ((time_sort(2) - time_dec) * vTec_t1) + ((time_dec - time_sort(1)) * vTec_t2)
+    return vTec
+    
+    return vTec# Reza Bordbari
+# This script selects the appropriate latitude block in the Rinex file
+
+def get_lat_block(IONEXFile = None,fullDate = None,time_dec = None,time_sort = None,lat_sort = None): 
+    fullDate1 = fullDate
+    if time_dec > 23:
+        time_sort[2] = 0
+        fullDate2 = fullDate + np.array([[0],[0],[1]])
+    else:
+        fullDate2 = fullDate
+    
+    # number of lines in the IONEX file.
+    NoL = CalcNumOfLines(IONEXFile)
+    # find the epochs and the two latitude blocks per epoch
+    DataFile = open(IONEXFile,'r')
+    fseek(DataFile,0,'bof')
+    tline = fgetl(DataFile)
+    for i in np.arange(1,NoL+1).reshape(-1):
+        # epoch one
+        e1 = strfind(tline,np.array([num2str(transpose(np.array([[fullDate1],[time_sort(1)],[0],[0]]))),'                        ','EPOCH OF CURRENT MAP']))
+        if not (len(e1)==0) :
+            condition = 1
+            while condition == 1:
+
+                # lat one
+                l1 = strfind(tline,np.array([num2str(lat_sort(1),'%.1f'),'-180.0 180.0   5.0 450.0']))
+                if not (len(l1)==0) :
+                    a = fgetl(DataFile)
+                    b = a
+                    for j in np.arange(1,4+1).reshape(-1):
+                        b = append(b,fgetl(DataFile))
+                    latBlock1_t1 = str2num(b)
+                tline = fgetl(DataFile)
+                # lat two
+                l2 = strfind(tline,np.array([num2str(lat_sort(2),'%.1f'),'-180.0 180.0   5.0 450.0']))
+                if not (len(l2)==0) :
+                    a = fgetl(DataFile)
+                    b = a
+                    for j in np.arange(1,4+1).reshape(-1):
+                        b = append(b,fgetl(DataFile))
+                    latBlock2_t1 = str2num(b)
+                    condition = 2
+
+        # epoch two
+        e2 = strfind(tline,np.array([num2str(transpose(np.array([[fullDate2],[time_sort(2)],[0],[0]]))),'                        ','EPOCH OF CURRENT MAP']))
+        if not (len(e2)==0) :
+            condition = 1
+            while condition == 1:
+
+                # lat one
+                l1 = strfind(tline,np.array([num2str(lat_sort(1),'%.1f'),'-180.0 180.0   5.0 450.0']))
+                if not (len(l1)==0) :
+                    a = fgetl(DataFile)
+                    b = a
+                    for j in np.arange(1,4+1).reshape(-1):
+                        b = append(b,fgetl(DataFile))
+                    latBlock1_t2 = str2num(b)
+                clear('a','b','j')
+                tline = fgetl(DataFile)
+                # lat two
+                l2 = strfind(tline,np.array([num2str(lat_sort(2),'%.1f'),'-180.0 180.0   5.0 450.0']))
+                if not (len(l2)==0) :
+                    a = fgetl(DataFile)
+                    b = a
+                    for j in np.arange(1,4+1).reshape(-1):
+                        b = append(b,fgetl(DataFile))
+                    latBlock2_t2 = str2num(b)
+                    condition = 2
+
+            break
+        tline = fgetl(DataFile)
+    
+    return latBlock1_t1,latBlock2_t1,latBlock1_t2,latBlock2_t2
+'''
 
 #get satellite position - ECEF
 def aer2ecef(azimuthDeg, elevationDeg, slantRange, obs_lat, obs_long, obs_alt):
