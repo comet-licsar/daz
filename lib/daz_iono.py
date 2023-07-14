@@ -66,13 +66,13 @@ def extract_iono_full(esds, framespd):
 
 def get_tecs(glat, glon, altitude, acq_times, returnhei = False, source='iri', alpha = 0.85):
     '''Gets estimated TEC over given point, up to given altitude
-
+    
     Args:
         glat, glon, altitude: coordinates and max 'iono height' to get the TEC values for. Altitude is in km
         acq_times (list of dt.datetime): time stamps to get the TEC over the given point
         returnhei (boolean):  if True, it would return TEC values but also estimated F2 peak heights (from IRI)
         source (str): source of TEC - either 'iri' for IRI2016 model (must be installed), or 'code' to autodownload from CODE
-        alpha (float): for CODE only, estimate of ratio of TEC towards 'to the satellite only'
+        alpha (float): for CODE only, estimate of ratio of TEC towards 'to the satellite only'. If 'auto', it will estimate it using iri. 0.85 is good value
     '''
     if returnhei and source == 'code':
         print('WARNING, height is estimated only through IRI model, now setting to it')
@@ -86,6 +86,10 @@ def get_tecs(glat, glon, altitude, acq_times, returnhei = False, source='iri', a
             TECs.append(iri_acq.TEC.values[0])
             heis.append(iri_acq.hmF2.values[0])
         elif source == 'code':
+            if getalpha:
+                iri_acq_gps = iri2016.IRI(acqtime, [0, 20000, 20000], glat, glon )
+                iri_acq = iri2016.IRI(acqtime, altkmrange, glat, glon )
+                alpha = float(iri_acq.TEC/iri_acq_gps.TEC)
             tec = get_vtec_from_code(acqtime, glat, glon)
             # decrease the value by some alpha... we expect alpha % of TEC being below the satellite.. should be improved
             #alpha = 0.85
