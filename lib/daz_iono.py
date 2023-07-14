@@ -160,10 +160,9 @@ def parse_map(tecmap, exponent = -1):
 
 def get_tecmaps(filename):
     exponent = int(grep1line('EXPONENT',ionix).split()[0]) # this is exponent of the data
-    correction_exponent = exponent * -1 # this is how to change to TECU
     with open(filename) as f:
         ionex = f.read()
-        return [parse_map(t, correction_exponent) for t in ionex.split('START OF TEC MAP')[1:]]
+        return [parse_map(t, exponent) for t in ionex.split('START OF TEC MAP')[1:]]
 
 
 def get_tec(tecmap, lat, lon):
