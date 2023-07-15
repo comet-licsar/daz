@@ -128,6 +128,8 @@ def get_vtec_from_code(acqtime, lat, lon, storedir = '/gws/nopw/j04/nceo_geohaza
     if not os.path.exists(ionix):
         print('ERROR: maybe you do not have 7za installed')
         return False
+    else:
+        rc=os.system('rm '+fullpath) # clean the .Z
     # prep 
     #hhmmss=acqtime.strftime('%H%M%S')
     # loading the TEC maps, thanks to https://notebook.community/daniestevez/jupyter_notebooks/IONEX (but improved towards xarray by ML B-)
@@ -139,6 +141,10 @@ def get_vtec_from_code(acqtime, lat, lon, storedir = '/gws/nopw/j04/nceo_geohaza
     lon_all = np.arange(-180.0,180.0+5,5.0)
     tecxr = xr.DataArray(data=tecmaps, dims=['time','lat','lon'],
                         coords=dict(time=timecoords, lon=lon_all, lat=lat_all) )
+    # interpolate through the nan values
+    tonan=9999
+    tecxr.where(tecxr!=tonan)
+    tecxr=tecxr.interpolate_na(dim="lon", method="linear", fill_value="extrapolate")
     tecxr = tecxr*1e+16 # from TECU
     if return_fullxr:
         return tecxr
@@ -162,7 +168,7 @@ def parse_map(tecmap, exponent = -1):
 
 
 def get_tecmaps(filename):
-    exponent = int(grep1line('EXPONENT',ionix).split()[0]) # this is exponent of the data
+    exponent = int(grep1line('EXPONENT',filename).split()[0]) # this is exponent of the data
     with open(filename) as f:
         ionex = f.read()
         return [parse_map(t, exponent) for t in ionex.split('START OF TEC MAP')[1:]]
