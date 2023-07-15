@@ -116,10 +116,11 @@ def get_vtec_from_code(acqtime, lat, lon, storedir = '/gws/nopw/j04/nceo_geohaza
     filename = 'CODG' + acqtime.strftime('%j') + '0.' + acqtime.strftime('%y')+ 'I.Z'
     url = 'http://ftp.aiub.unibe.ch/CODE/' + acqtime.strftime('%Y') + '/' + filename
     fullpath = os.path.join(storedir,filename)
-    if not os.path.exists(fullpath):
-        # download this
-        wget.download(url, out=storedir)
     ionix = fullpath[:-2]
+    if not os.path.exists(ionix):
+        if not os.path.exists(fullpath):
+            # download this
+            wget.download(url, out=storedir)
     #try:
         #    object1 = open(fullpath, 'rb').read()
         #    ionix = zlib.decompress(object1)  # does not work!!!
