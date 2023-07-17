@@ -77,6 +77,10 @@ def get_tecs(glat, glon, altitude, acq_times, returnhei = False, source='iri', a
     if returnhei and source == 'code':
         print('WARNING, height is estimated only through IRI model, now setting to it')
         source = 'iri'
+    if alpha == 'auto':
+        getalpha=True
+    else:
+        getalpha=False
     altkmrange = [0, altitude, altitude]
     TECs = []
     heis = []
