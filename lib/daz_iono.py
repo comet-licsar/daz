@@ -154,15 +154,19 @@ def get_vtec_from_code(acqtime, lat, lon, storedir = '/gws/nopw/j04/nceo_geohaza
     if return_fullxr:
         return tecxr
     else:
-        # return interpolated for the given lonlat
-        h_time = float(acqtime.strftime('%H'))
-        m_time = float(acqtime.strftime('%M'))
-        s_time = float(acqtime.strftime('%S'))
-        # given time in decimal format
-        time_dec = h_time + (m_time/60) + (s_time / 3600)
-        #
-        tec = float(tecxr.interp(time=time_dec, lon=lon,lat=lat, method='cubic')) # should be better than linear, but maybe quadratic is more suitable?
-        return tec
+        return get_vtec_from_tecxr(tecxr, acqtime, lat, lon)
+
+# get_vtec_from_code(acqtime, lat, lon, storedir = '/gws/nopw/j04/nceo_geohazards_vol1/code_iono', return_fullxr = False):
+def get_vtec_from_tecxr(tecxr, acqtime, lat, lon):
+    '''Function to be used with tecxr (output from get_vtec_from_code) to get the tec for given coords'''
+    h_time = float(acqtime.strftime('%H'))
+    m_time = float(acqtime.strftime('%M'))
+    s_time = float(acqtime.strftime('%S'))
+    # given time in decimal format
+    time_dec = h_time + (m_time/60) + (s_time / 3600)
+    #
+    tec = float(tecxr.interp(time=time_dec, lon=lon,lat=lat, method='cubic')) # should be better than linear, but maybe quadratic is more suitable?
+    return tec
 
 
 import re
