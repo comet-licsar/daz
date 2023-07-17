@@ -129,12 +129,12 @@ def get_vtec_from_code(acqtime, lat, lon, storedir = '/gws/nopw/j04/nceo_geohaza
         #    object1 = open(fullpath, 'rb').read()
         #    ionix = zlib.decompress(object1)  # does not work!!!
     if not os.path.exists(ionix):
-        rc = os.system('cd '+storedir+'; 7za x '+filename+' >/dev/null 2>/dev/null')
+        rc = os.system('cd '+storedir+'; 7za x '+filename+' >/dev/null 2>/dev/null; rm '+fullpath)
     if not os.path.exists(ionix):
         print('ERROR: maybe you do not have 7za installed')
         return False
-    else:
-        rc=os.system('rm '+fullpath) # clean the .Z
+    #else:
+    #    rc=os.system('rm '+fullpath) # clean the .Z
     # prep 
     #hhmmss=acqtime.strftime('%H%M%S')
     # loading the TEC maps, thanks to https://notebook.community/daniestevez/jupyter_notebooks/IONEX (but improved towards xarray by ML B-)
