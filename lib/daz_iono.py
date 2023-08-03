@@ -14,7 +14,7 @@ import nvector as nv
 import iri2016
 import pyproj
 import numpy as np
-
+import re
 
 
 
@@ -112,9 +112,16 @@ except:
     print('error loading some library, use of CODE will fail')
 
 
-def get_vtec_from_code(acqtime, lat, lon, storedir = '/gws/nopw/j04/nceo_geohazards_vol1/code_iono', return_fullxr = False):
-    '''adapted from Reza Bordbari script, plus using functions from https://notebook.community/daniestevez/jupyter_notebooks/IONEX
-    '''
+def get_vtec_from_code(acqtime, lat = 0, lon = 0, storedir = '/gws/nopw/j04/nceo_geohazards_vol1/code_iono', return_fullxr = False):
+    """ Adapted from Reza Bordbari script, plus using functions from https://notebook.community/daniestevez/jupyter_notebooks/IONEX
+
+    Args:
+        acqtime (dt.datetime)
+        lat (float)
+        lon (float)
+        storedir (str)
+        return_fullxr (bool): if True, will return full TEC datacube
+    """
     #D = acqtime.strftime('%Y%m%d')
     #ipp = np.array([lat,lon])
     filename = 'CODG' + acqtime.strftime('%j') + '0.' + acqtime.strftime('%y')+ 'I.Z'
@@ -156,20 +163,38 @@ def get_vtec_from_code(acqtime, lat, lon, storedir = '/gws/nopw/j04/nceo_geohaza
     else:
         return get_vtec_from_tecxr(tecxr, acqtime, lat, lon)
 
+
 # get_vtec_from_code(acqtime, lat, lon, storedir = '/gws/nopw/j04/nceo_geohazards_vol1/code_iono', return_fullxr = False):
-def get_vtec_from_tecxr(tecxr, acqtime, lat, lon):
+def get_vtec_from_tecxr(tecxr, acqtime, lat, lon, rotate=True):
     '''Function to be used with tecxr (output from get_vtec_from_code) to get the tec for given coords'''
     h_time = float(acqtime.strftime('%H'))
     m_time = float(acqtime.strftime('%M'))
     s_time = float(acqtime.strftime('%S'))
     # given time in decimal format
     time_dec = h_time + (m_time/60) + (s_time / 3600)
-    #
-    tec = float(tecxr.interp(time=time_dec, lon=lon,lat=lat, method='cubic')) # should be better than linear, but maybe quadratic is more suitable?
+    # ML: 2023/08, based on : https://github.com/insarlab/MintPy/blob/main/src/mintpy/objects/ionex.py
+    # that is actually based on
+    # Schaer, S., Gurtner, W., & Feltens, J. (1998). IONEX: The ionosphere map exchange format
+    #         version 1.1. Paper presented at the Proceedings of the IGS AC workshop, Darmstadt, Germany.
+    if rotate:
+        # 3D interpolation with rotation as above reference
+        htimes = tecxr.time.values
+        pretime = int(htimes[htimes <= time_dec][-1])
+        postime = int(htimes[htimes >= time_dec][0])
+        #
+        lon0 = lon + (time_dec - pretime) * 360. / 24.
+        lon1 = lon + (time_dec - postime) * 360. / 24.
+        #
+        tec_val0 = float(tecxr.interp(time=pretime, lon=lon0, lat=lat, method='linear'))
+        tec_val1 = float(tecxr.interp(time=postime, lon=lon1, lat=lat, method='linear'))
+        #
+        tec = ((postime - time_dec) / (postime - pretime) * tec_val0
+                   + (time_dec - pretime) / (postime - pretime) * tec_val1)
+    else:
+        # previous attempt, but still too different from the S1_ETAD CODE outputs (that rotates the Earth towards the Sun..)
+        tec = float(tecxr.interp(time=time_dec, lon=lon,lat=lat, method='cubic')) # should be better than linear, but maybe quadratic is more suitable?
     return tec
 
-
-import re
 
 def parse_map(tecmap, exponent = -1):
     tecmap = re.split('.*END OF TEC MAP', tecmap)[0]
