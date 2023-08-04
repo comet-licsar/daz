@@ -220,7 +220,8 @@ def get_tec(tecmap, lat, lon):
 
 
 '''
-    
+
+Reza's code (after attempt to convert mat2python - sorry for ugliness here, ML)
 def get_vtec_from_code(yyyymmdd = None,day_of_year = None,hhmmss = None,ipp_lat = None,ipp_lon = None): 
     ipp = np.array([ipp_lat,ipp_lon])
     D = num2str(yyyymmdd)
