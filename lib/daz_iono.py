@@ -64,7 +64,7 @@ def extract_iono_full(esds, framespd):
 # step 3 - get daz iono
 ################### IONOSPHERE 
 
-def get_tecs(glat, glon, altitude, acq_times, returnhei = False, source='iri', alpha = 0.85):
+def get_tecs(glat, glon, altitude, acq_times, returnhei = False, source='iri', alpha = 0.9):
     '''Gets estimated TEC over given point, up to given altitude
     
     Args:
