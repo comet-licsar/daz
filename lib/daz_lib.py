@@ -562,6 +562,13 @@ def get_s1b_offset(epd, fpd, col = 'daz_mm_notide_noiono', fix_pod_offset = True
 
 
 def flag_s1b(epochdates, masterdate, mastersat = 'A', returnstr = False):
+    """
+    Args:
+        epochdates (list of dt.datetime.date)
+        masterdate (dt.datetime.date)
+        mastersat (str): 'A' or 'B'
+        returnstr (bool): if True, returns 'A' or 'B', otherwise returns 1 for 'B'
+    """
     if mastersat == 'B':
         masterdate = masterdate + pd.Timedelta('6 days')
     isB = []
