@@ -466,7 +466,7 @@ def get_abs_iono_corr(frame,esds,framespd):
     return daz_iono
 '''
 
-def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = False, out_tec_master = False, out_tec_all = False):
+def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = False, out_tec_master = False, out_tec_all = False, ionosource='iri'):
     '''
     use method either 'gomba' - only gradient, or 'liang' that includes also some extra F2 height correction..
     '''
@@ -550,8 +550,8 @@ def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = Fal
         PippA = path_ipp.intersect(path_scene_satgA).to_geo_point()
         PippB = path_ipp.intersect(path_scene_satgB).to_geo_point()
         ######### get TECS for A, B
-        TECV_A = get_tecs(PippA.latitude_deg, PippA.longitude_deg, round(sat_alt/1000), [epochdate], False)[0]
-        TECV_B = get_tecs(PippB.latitude_deg, PippB.longitude_deg, round(sat_alt/1000), [epochdate], False)[0]
+        TECV_A = get_tecs(PippA.latitude_deg, PippA.longitude_deg, round(sat_alt/1000), [epochdate], False, source=ionosource)[0]
+        TECV_B = get_tecs(PippB.latitude_deg, PippB.longitude_deg, round(sat_alt/1000), [epochdate], False, source=ionosource)[0]
         # get inc angle at IPP - see iono. single layer model function
         earth_radius = 6378160 # m
         sin_thetaiono = earth_radius/(earth_radius+hiono) * np.sin(theta)

@@ -682,7 +682,11 @@ def fix_oldorb_shift_oneoff(frame, tmpdir = '/work/scratch-pw3/licsar/earmla/tem
             print('some error with frame '+frame+', epoch '+str(epoch))
 
 
-def get_azioffs_old_new_POD(frame, epochs = None, datelim = dt.datetime(2020,8,1).date()):
+def get_azioffs_old_new_POD(frame, epochs = None):
+    """ Function to get correction for PODs established after 2020-07-31 in azimuth
+    """
+    print('getting old/new POD difference corrections for frame '+frame)
+    datelim = dt.datetime(2020,7,31).date()
     if not epochs:
         epochs = fc.get_epochs(frame, return_as_dt=True) #2018-09-01
     master_s1ab = get_frame_master_s1ab(frame)
