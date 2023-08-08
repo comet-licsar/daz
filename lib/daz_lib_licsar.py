@@ -6,8 +6,12 @@ from LiCSAR_lib.LiCSAR_misc import *
 import os, glob
 import pandas as pd
 import framecare as fc
+try:
+    from orbit_lib import *
+except:
+    print('LiCSAR orbit_lib not found, cannot process orbit files')
 
-# maybe not needed?
+
 from daz_lib import *
 
 
@@ -677,6 +681,36 @@ def fix_oldorb_shift_oneoff(frame, tmpdir = '/work/scratch-pw3/licsar/earmla/tem
         except:
             print('some error with frame '+frame+', epoch '+str(epoch))
 
+
+def get_azioffs_old_new_POD(frame, epochs = None, datelim = dt.datetime(2020,8,1).date()):
+    if not epochs:
+        epochs = fc.get_epochs(frame, return_as_dt=True) #2018-09-01
+    master_s1ab = get_frame_master_s1ab(frame)
+    master = fc.get_master(frame, asdatetime = True)
+    azioffs = []
+    selepochs = []
+    for epoch in epochs:
+        if epoch > datelim:
+            break
+        epoch_s1ab = flag_s1b([epoch], master, master_s1ab, returnstr=True )[0]
+        timesample = dt.datetime.combine(epoch, master.time())
+        neworbs = get_orbit_filenames_for_datetime(timesample, 'POEORB', s1ab='S1'+epoch_s1ab)
+        oldorbs = getoldorbpath(neworbs)
+        neworb = neworbs[0]
+        oldorb = oldorbs[0]
+        if not oldorb:
+            print('none old for '+str(epoch))
+            break
+        azioff = get_azi_diff_from_two_orbits(oldorb, neworb, timesample)
+        selepochs.append(epoch)
+        azioffs.append(azioff)
+    if not selepochs:
+        print('no epoch was selected for correction')
+        return False
+    selazis = np.array(azioffs)*1000
+    azispd = pd.DataFrame({'epoch': selepochs,
+     'azioff_mm': selazis})
+    return azispd
 
 
 def get_azshift_lt(ltfile = '20210425.mli.lt', offile = '20210413_20210425.off.start', az_ml = 4, rg_ml = 20, return_rg = True):
