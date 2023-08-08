@@ -633,6 +633,7 @@ def fix_pod_offset(esds, using_orbits = False):
         esds['pod_diff_azi_m'] = esds[col]*0
         for frame, group in esds.groupby('frame'):
             print('getting POD diffs for frame '+frame)
+            epochs = group['epochdate'].to_numpy()
             fepazis = get_azioffs_old_new_POD(frame, epochs = epochs)
             if not fepazis.empty:
                 # merge to group and then update esds
