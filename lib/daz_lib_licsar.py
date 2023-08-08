@@ -687,7 +687,7 @@ def get_azioffs_old_new_POD(frame, epochs = None):
     """
     print('getting old/new POD difference corrections for frame '+frame)
     datelim = dt.datetime(2020,7,31).date()
-    if not epochs:
+    if type(epochs) == type(None):
         epochs = fc.get_epochs(frame, return_as_dt=True) #2018-09-01
     master_s1ab = get_frame_master_s1ab(frame)
     master = fc.get_master(frame, asdatetime = True)
@@ -711,9 +711,9 @@ def get_azioffs_old_new_POD(frame, epochs = None):
     if not selepochs:
         print('no epoch was selected for correction')
         return False
-    selazis = np.array(azioffs)*1000
-    azispd = pd.DataFrame({'epoch': selepochs,
-     'azioff_mm': selazis})
+    selazis = np.array(azioffs) *1000
+    azispd = pd.DataFrame({'epochdate': selepochs,
+     'pod_diff_azi_mm': selazis})
     return azispd
 
 

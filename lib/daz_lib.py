@@ -3,6 +3,7 @@
 # general imports
 import pandas as pd
 import numpy as np
+import datetime as dt
 from scipy.constants import speed_of_light
 from scipy.constants import pi
 from scipy import signal
@@ -608,19 +609,39 @@ def flag_s1b_esds(esds, framespd):
     return esds
 
 
-def fix_pod_offset(esds):
+def fix_pod_offset(esds, using_orbits = False):
     """Function to fix the 39 mm shift after new orbits in 2020-07-29/30
     Args:
-        esds (pd.Dataframes)   as loaded (i.e. with the relevant daz columns)
+        esds (pd.Dataframe):   as loaded (i.e. with the relevant daz columns)
+        using_orbits (bool):    if True, it will try use directly PODs to find diff (only with daz_lib_licsar)
+    Returns:
+        pd.DataFrame :  original esds with applied correction
     """
     col='daz_total_wrt_orbits'
     #if 'S1AorB' not in esds.columns:
-    print('subtracting towards 2020-07-30')
     #ddate = pd.Timestamp('2020-07-30')
     #ep = esds[esds.epochdate < ddate][col]
-    ep = esds[esds.epoch < 20200730 ][col]
-    offset_px = 39/14000 #(framespd.azimuth_resolution.mean()*1000) # just a mean
-    esds.update(ep.subtract(offset_px))
+    if not using_orbits:
+        print('subtracting towards 2020-07-30')
+        #ep = esds[esds.epoch < 20200730 ][col]
+        ep = esds[esds.epochdate <= dt.datetime(2020,7,30).date() ][col]
+        offset_px = 39/14000 #(framespd.azimuth_resolution.mean()*1000) # just a mean
+        esds.update(ep.subtract(offset_px))
+    else:
+        print('warning, this functionality is ready only for LiCSAR environment')
+        from daz_lib_licsar import get_azioffs_old_new_POD
+        esds['pod_diff_azi_m'] = esds[col]*0
+        for frame, group in esds.groupby('frame'):
+            print('getting POD diffs for frame '+frame)
+            fepazis = get_azioffs_old_new_POD(frame, epochs = epochs)
+            if not fepazis.empty:
+                # merge to group and then update esds
+                group = group.merge(fepazis, how='inner', on='epochdate')
+                group['pod_diff_azi_m']=group['pod_diff_azi_m']+group['pod_diff_azi_mm']/1000
+                group=group.drop(columns=['pod_diff_azi_mm'])
+                esds.update(group)
+        print('Correcting the final values in esds dataset')
+        esds[col] = esds[col]+esds['pod_diff_azi_m']/14 # using directly 14 m resolution.. should be precise enough
     return esds
 
 
