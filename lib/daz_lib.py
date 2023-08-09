@@ -634,13 +634,19 @@ def fix_pod_offset(esds, using_orbits = False):
         for frame, group in esds.groupby('frame'):
             print('getting POD diffs for frame '+frame)
             epochs = group['epochdate'].to_numpy()
-            fepazis = get_azioffs_old_new_POD(frame, epochs = epochs)
-            if not fepazis.empty:
-                # merge to group and then update esds
-                group = group.merge(fepazis, how='inner', on='epochdate')
-                group['pod_diff_azi_m']=group['pod_diff_azi_m']+group['pod_diff_azi_mm']/1000
-                group=group.drop(columns=['pod_diff_azi_mm'])
-                esds.update(group)
+            try:
+                fepazis = get_azioffs_old_new_POD(frame, epochs = epochs)
+                if not fepazis.empty:
+                    # merge to group and then update esds
+                    group = group.merge(fepazis, how='inner', on='epochdate')
+                    group['pod_diff_azi_m']=group['pod_diff_azi_m']+group['pod_diff_azi_mm']/1000
+                    group=group.drop(columns=['pod_diff_azi_mm'])
+                    esds.update(group)
+            except:
+                print('some error with frame '+frame+'. Setting only -39 mm correction.')
+                ep = group[group.epochdate <= dt.datetime(2020,7,30).date() ]['pod_diff_azi_m']
+                offset_m = 0.039
+                esds.update(ep.subtract(offset_m))
         print('Correcting the final values in esds dataset')
         esds[col] = esds[col]+esds['pod_diff_azi_m']/14 # using directly 14 m resolution.. should be precise enough
     return esds
