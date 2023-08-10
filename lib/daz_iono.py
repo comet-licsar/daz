@@ -506,7 +506,8 @@ def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = Fal
     except:
         scene_alt = 0
     #to get position of the satellite - UNCLEAR about slantRange - is this w.r.t. DEM? (should ask GAMMA) - if not (only in WGS-84), i should use scene_alt=0!
-    x, y, z = aer2ecef(azimuthDeg, elevationDeg, slantRange, scene_center_lat, scene_center_lon, scene_alt)
+    # 2023/08: checked using orbits - the slantranfe is wrt ellipsoid! setting scene alt 0
+    x, y, z = aer2ecef(azimuthDeg, elevationDeg, slantRange, scene_center_lat, scene_center_lon, 0) #scene_alt)
     satg_lat, satg_lon, sat_alt = ecef2latlonhei(x, y, z)
     Psatg = wgs84.GeoPoint(latitude=satg_lat, longitude=satg_lon, degrees=True)
     # get middle point between scene and sat - and get F2 height for it
@@ -534,7 +535,7 @@ def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = Fal
         # range_IPP = hiono/np.sin(theta)
         # but maybe not... let's do it simpler:
         range_IPP = slantRange * hiono / sat_alt
-        x, y, z = aer2ecef(azimuthDeg, elevationDeg, range_IPP, scene_center_lat, scene_center_lon, scene_alt)
+        x, y, z = aer2ecef(azimuthDeg, elevationDeg, range_IPP, scene_center_lat, scene_center_lon, 0) #scene_alt)
         ippg_lat, ippg_lon, ipp_alt = ecef2latlonhei(x, y, z)
         Pippg = wgs84.GeoPoint(latitude=ippg_lat, longitude=ippg_lon, degrees=True)
         # then get A', B'
