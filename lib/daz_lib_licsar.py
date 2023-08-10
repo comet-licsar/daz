@@ -15,11 +15,46 @@ except:
 from daz_lib import *
 
 
-# e.g.
-# framelist=pd.read_csv('frames.txt'); framelist=list(framelist.frame)
-# where you may get frames.txt e.g. by:
-# cd $LiCSAR_procdir
-# for tr in `seq 1 175`; do for f in `ls $tr`; do m=`ls $tr/$f/SLC | head -n1`; hgtfile=$LiCSAR_public/$tr/$f/metadata/$f'.geo.hgt.tif'; ll=`gdalinfo $hgtfile | grep ^Center`; lon=`echo $ll | cut -d "," -f1 | cut -d '(' -f2`; lat=`echo $ll | cut -d ")" -f1 | cut -d ',' -f2`; echo $f","$m","$lon","$lat >> $outfr;  done;done
+def create_framelist(outfile='frames.txt'):
+    """ Creates frames.txt for all frames in LiCSInfo that contains table in:
+    frame,master,center_lon,center_lat
+    """
+    framespd = fc.get_all_frames(only_initialised = True, merge = True)
+    # get lons,lats:
+    c=framespd.geometry.centroid
+    lons = []
+    lats = []
+    for cc in c:
+        lons.append(cc.coords[0][0])
+        lats.append(cc.coords[0][1])
+    # get masters:
+    masters = []
+    for frame in framespd.frameID:
+        masters.append(fc.get_master(frame))
+    framespd['frame'] = framespd['frameID']
+    framespd['master'] = masters
+    framespd['center_lon'] = lons
+    framespd['center_lat'] = lats
+    framespd = framespd.drop(columns=['geometry', 'frameID'])
+    framespd.to_csv(outfile, index=False)
+    return list(framespd.frameID)
+
+'''
+e.g.
+framelist=pd.read_csv('frames.txt'); framelist=list(framelist.frame)
+
+where you may get frames.txt using the function create_framelist(), or using the previous code:
+cd $LiCSAR_procdir
+for tr in `seq 1 175`; do for f in `ls $tr`; do
+  m=`ls $tr/$f/SLC | head -n1`; 
+  hgtfile=$LiCSAR_public/$tr/$f/metadata/$f'.geo.hgt.tif'; 
+  ll=`gdalinfo $hgtfile | grep ^Center`; 
+  lon=`echo $ll | cut -d "," -f1 | cut -d '(' -f2`; 
+  lat=`echo $ll | cut -d ")" -f1 | cut -d ',' -f2`; 
+  echo $f","$m","$lon","$lat >> $outfr;  
+done;done
+'''
+
 def extract2txt_esds_all_frames(framelist, outfile='esds.txt'):
     dazes=pd.DataFrame()
     for frame in framelist:

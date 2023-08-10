@@ -21,7 +21,7 @@ import re
 # get daz iono
 ################### IONOSPHERE 
 
-def extract_iono_full(esds, framespd):
+def extract_iono_full(esds, framespd, ionosource = 'iri'):
     # estimating the ionosphere - takes long (several hours)
     # also, storing TECS values (i.e. TEC in slant direction, from IRI2016)
     esds['tecs_A'] = 0.0
@@ -39,7 +39,7 @@ def extract_iono_full(esds, framespd):
         try:
             #daz_iono_with_F2 = calculate_daz_iono(frame, esds, framespd)
             #daz_iono_grad, hionos, tecs_A_master, tecs_B_master = calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = True, out_tec_master = True)
-            daz_iono_grad, hionos, tecs_A_master, tecs_B_master, tecs_A, tecs_B = calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = True, out_tec_all = True)
+            daz_iono_grad, hionos, tecs_A_master, tecs_B_master, tecs_A, tecs_B = calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = True, out_tec_all = True, ionosource=ionosource)
             hiono = np.mean(hionos)
             hiono_std = np.std(hionos)
         except:
@@ -109,7 +109,7 @@ try:
     #import zlib
     from LiCSAR_misc import grep1line
 except:
-    print('error loading some library, use of CODE will fail')
+    print('error loading libraries to use of CODE (either wget or LiCSAR_misc). Use of CODE will fail')
 
 
 def get_vtec_from_code(acqtime, lat = 0, lon = 0, storedir = '/gws/nopw/j04/nceo_geohazards_vol1/code_iono', return_fullxr = False):
