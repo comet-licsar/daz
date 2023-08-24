@@ -2,7 +2,7 @@
 """
 v1.0 2022-01-03 Milan Lazecky, Leeds Uni
 
-This script is to be run at JASMIN. It will grab output of prepare_daz_licsar.sh (esds.txt and frames.txt) or using LiCSquery - get_daz etc.,
+This script is to be run at JASMIN. It will grab output files (esds.txt and frames.txt) of either daz_lib_licsar.extract_all2txt() or (older) prepare_daz_licsar.sh script.
 extract additional data form the LiCSAR system and save as frames.csv (note esds.txt is not really needed now, as its csv will be prepared in next steps).
 
 ===============

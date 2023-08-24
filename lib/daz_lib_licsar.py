@@ -15,6 +15,14 @@ except:
 from daz_lib import *
 
 
+def extract_all2txt(outfr = 'frames.txt', outdaz = 'esds.txt'):
+    """ Main function to extract all frame and daz data from the LiCSAR database.
+    """
+    frames = create_framelist(outfr)
+    extract2txt_esds_all_frames(framelist = frames, outfile=outdaz)
+    print('done, please continue by daz_01_prepare_inputs.py')
+
+
 def create_framelist(outfile='frames.txt'):
     """ Creates frames.txt for all frames in LiCSInfo that contains table in:
     frame,master,center_lon,center_lat
@@ -37,7 +45,7 @@ def create_framelist(outfile='frames.txt'):
     framespd['center_lat'] = lats
     framespd = framespd.drop(columns=['geometry', 'frameID'])
     framespd.to_csv(outfile, index=False)
-    return list(framespd.frameID)
+    return list(framespd.frame)
 
 '''
 e.g.
@@ -464,7 +472,7 @@ def fix_oldorb_update_off(offile, azshiftm=-0.039, returnval = False):
     # get previous estimate from off file
     azioffset = float(grep1line('azimuth_offset_polynomial', offile).split()[1])
     azshiftpx = azshiftm/aziorigres
-    # should be -39 mm here to fit the RDC-resampled data.. checking now
+    # should be -39 mm here to fit the RDC-resampled data (although directly using POD would give better estimate)
     aziok = azioffset + azshiftpx
     # get it back to the off file
     oldstr='azimuth_offset_polynomial.*'
@@ -750,6 +758,7 @@ def get_azioffs_old_new_POD(frame, epochs = None):
     azispd = pd.DataFrame({'epochdate': selepochs,
      'pod_diff_azi_mm': selazis})
     return azispd
+
 
 
 def get_azshift_lt(ltfile = '20210425.mli.lt', offile = '20210413_20210425.off.start', az_ml = 4, rg_ml = 20, return_rg = True):
