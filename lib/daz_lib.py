@@ -73,6 +73,20 @@ def EN2azi(N, E, heading = -169):
 # step 2 - get solid Earth tides
 ################### SOLID EARTH TIDES
 
+def get_SET_for_frame(frame, esds, framespd):
+    """ Updated function to get ENU solid earth tides for given frame.
+    Warning, this solution probably does not include corrections to leap seconds1
+    """
+    import pysolid
+    #lat, lon = 
+    #dt0 = # first epoch datetime
+    #dt1 = # last epoch datetime (plus few seconds)
+    step_sec = 6*24*3600 # 6 days, to capture S1A/B
+    #dtout, E, N, U = pysolid.calc_solid_earth_tides_point(lat, lon, dt0, dt1, step_sec=60)
+    # and then need to extract the data towards epochs, and diff with the reference epoch before returning
+    return True
+
+
 def get_tide_in_azimuth(lat, lon, hei, azi, time1):
     '''
     unfinished function to use ETERNA model from 
