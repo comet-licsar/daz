@@ -22,7 +22,7 @@ frame,master,center_lon,center_lat,heading,azimuth_resolution,avg_incidence_angl
 =====
 Usage
 =====
-daz_01_prepare_inputs.py [--infra frames.txt] [--outfra frames.csv] [--inesd esds_orig.txt] [--outesd esds.txt] [--orbdiff_fix]
+daz_01_prepare_inputs.py [--infra frames.txt] [--outfra frames.csv] [--indaz esds_orig.txt] [--outdaz esds.txt] [--orbdiff_fix]
 
  --orbdiff_fix - would apply the 39 mm fix due to change in orbits in 2020-07-29/30 - TODO: use the real POD diff (already done in LiCSAR, need to add here)
 """
@@ -67,7 +67,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "h", ["help", "orbdiff_fix", "inesd =", "infra =", "outesd =", "outfra ="])
+            opts, args = getopt.getopt(argv[1:], "h", ["help", "orbdiff_fix", "indaz =", "infra =", "outdaz =", "outfra ="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -76,11 +76,11 @@ def main(argv=None):
                 return 0
             elif o == "--orbdiff_fix":
                 orbdiff_fix = True
-            elif o == "--inesd":
+            elif o == "--indaz":
                 indazfile = a
             elif o == "--infra":
                 inframesfile = a
-            elif o == "--outesd":
+            elif o == "--outdaz":
                 outdazfile = a
             elif o == "--outfra":
                 outframesfile = a
