@@ -22,12 +22,21 @@ import re
 ################### IONOSPHERE 
 
 def extract_iono_full(esds, framespd, ionosource = 'iri'):
+    """ Full extraction of ionospheric effect from ionosource.
+    Note this will create column with the phase advanced effect recalculated to apparent azimuth offset [mm] that has opposite sign.
+    Therefore this conforms the GRL article and you can subtract this correction from the original values, as usual.
+    
+    Args:
+        ionosource (str):   either 'iri' or 'code'
+    Returns:
+        esds, framespd
+    """
     # estimating the ionosphere - takes long (several hours)
     # also, storing TECS values (i.e. TEC in slant direction, from IRI2016)
     esds['tecs_A'] = 0.0
     esds['tecs_B'] = 0.0
-    esds['daz_iono_grad_mm'] = 0.0
-    esds['daz_mm_notide_noiono_grad'] = 0.0
+    esds['daz_iono_mm'] = 0.0
+    #esds['daz_mm_notide_noiono_grad'] = 0.0
     framespd['Hiono'] = 0.0
     framespd['Hiono_std'] = 0.0
     framespd['Hiono_range'] = 0.0
@@ -46,10 +55,12 @@ def extract_iono_full(esds, framespd, ionosource = 'iri'):
             print('some error occurred here')
             continue
         selesds=esds[esds['frame']==frame].copy()
-        selesds['daz_iono_grad_mm'] = daz_iono_grad*resolution*1000
+        # 2023/08: changing sign to keep consistent with the GRL article
+        selesds['daz_iono_mm'] = -1*daz_iono_grad*resolution*1000
         selesds['tecs_A'] = tecs_A
         selesds['tecs_B'] = tecs_B
-        selesds['daz_mm_notide_noiono_grad'] = selesds['daz_mm_notide'] + selesds['daz_iono_grad_mm'] #*resolution*1000
+        # skipping the correction here, since daz_mm_notide might not exist/not needed:
+        #selesds['daz_mm_notide_noiono_grad'] = selesds['daz_mm_notide'] + selesds['daz_iono_grad_mm'] #*resolution*1000
         esds.update(selesds)
         framespd.at[framespd[framespd['frame']==frame].index[0], 'Hiono'] = hiono
         framespd.at[framespd[framespd['frame']==frame].index[0], 'Hiono_std'] = hiono_std
