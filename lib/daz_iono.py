@@ -106,6 +106,9 @@ def get_tecs(glat, glon, altitude, acq_times, returnhei = False, source='iri', a
                 iri_acq = iri2016.IRI(acqtime, altkmrange, glat, glon )
                 alpha = float(iri_acq.TEC/iri_acq_gps.TEC)
             tec = get_vtec_from_code(acqtime, glat, glon)
+            if not tec:
+                # CODE data is not available earlier than with 6 months delay..
+                tec = 0
             # decrease the value by some alpha... we expect alpha % of TEC being below the satellite.. should be improved
             #alpha = 0.85
             tec = alpha*tec
@@ -480,6 +483,8 @@ def get_abs_iono_corr(frame,esds,framespd):
 def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = False, out_tec_master = False, out_tec_all = False, ionosource='iri'):
     '''
     use method either 'gomba' - only gradient, or 'liang' that includes also some extra F2 height correction..
+    2023/08: Liang method was first implemented here and a lot happened since that time.. Please consider it obsolete.
+    We should remove stating 'gomba' as well, since the correction is not really following his work any more (but indeed, his article was great init)
     '''
     selected_frame_esds = esds[esds['frame'] == frame].copy()
     frameta = framespd[framespd['frame']==frame]
