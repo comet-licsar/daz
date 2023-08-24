@@ -67,7 +67,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "h", ["help", "orbdiff_fix", "indaz =", "infra =", "outdaz =", "outfra ="])
+            opts, args = getopt.getopt(argv[1:], "h", ["help", "orbdiff_fix", "indaz=", "infra=", "outdaz=", "outfra="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -106,7 +106,7 @@ def main(argv=None):
         print('fixing the orb diff values in '+indazfile)
         esds = fix_pod_offset(esds)
     
-    
+    # some other details to prepare:
     try:
         esds = flag_s1b_esds(esds, framespd)
     except:

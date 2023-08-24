@@ -11,7 +11,7 @@ Inputs :
  - frames.csv - contains data with heading:
 frame,master,center_lon,center_lat,heading,azimuth_resolution,avg_incidence_angle,centre_range_m,centre_time,dfDC
  - esds.csv - contains data with heading:
-,frame,orbits_precision,daz_tide_mm,epochdate,daz_mm,years_since_beginning[,daz_mm_notide]
+,frame,orbits_precision,epochdate,daz_mm,years_since_beginning[,daz_tide_mm,daz_mm_notide]
 
 Outputs :
  - esds_with_iono.csv - added iono columns
@@ -60,7 +60,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "h", ["help", "use_code", "indaz =", "infra =", "outdaz =", "outfra ="])
+            opts, args = getopt.getopt(argv[1:], "h", ["help", "use_code", "indaz=", "infra=", "outdaz=", "outfra="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -69,6 +69,7 @@ def main(argv=None):
                 return 0
             if o == '--use_code':
                 ionosource = 'code'
+                print('using CODE for iono correction - note only data older than 6 months will have the CODE data available (rest=0)')
             elif o == "--indaz":
                 indazfile = a
             elif o == "--infra":
