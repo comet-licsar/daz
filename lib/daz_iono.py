@@ -52,7 +52,7 @@ def extract_iono_full(esds, framespd, ionosource = 'iri'):
             hiono = np.mean(hionos)
             hiono_std = np.std(hionos)
         except:
-            print('some error occurred here')
+            print('some error occurred extracting TEC(s) here')
             continue
         selesds=esds[esds['frame']==frame].copy()
         # 2023/08: changing sign to keep consistent with the GRL article
@@ -105,10 +105,12 @@ def get_tecs(glat, glon, altitude, acq_times, returnhei = False, source='iri', a
                 iri_acq_gps = iri2016.IRI(acqtime, [0, 20000, 20000], glat, glon )
                 iri_acq = iri2016.IRI(acqtime, altkmrange, glat, glon )
                 alpha = float(iri_acq.TEC/iri_acq_gps.TEC)
-            tec = get_vtec_from_code(acqtime, glat, glon)
-            if not tec:
-                # CODE data is not available earlier than with 6 months delay..
+            try:
+                tec = get_vtec_from_code(acqtime, glat, glon)
+            except:
+                # CODE data is not available earlier than with 6 months delay.. or more?
                 tec = 0
+                print('No CODE data for date '+str(acqtime.date())+'. Setting zero.')
             # decrease the value by some alpha... we expect alpha % of TEC being below the satellite.. should be improved
             #alpha = 0.85
             tec = alpha*tec
