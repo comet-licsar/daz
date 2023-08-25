@@ -652,10 +652,11 @@ def fix_pod_offset(esds, using_orbits = False):
                 fepazis = get_azioffs_old_new_POD(frame, epochs = epochs)
                 if not fepazis.empty:
                     # merge to group and then update esds
-                    group = group.merge(fepazis, how='inner', on='epochdate')
-                    group['pod_diff_azi_m']=group['pod_diff_azi_m']+group['pod_diff_azi_mm']/1000
-                    group=group.drop(columns=['pod_diff_azi_mm'])
-                    esds.update(group)
+                    groupd = group.copy(deep=True)
+                    groupd = groupd.merge(fepazis, how='inner', on='epochdate')
+                    groupd['pod_diff_azi_m']=groupd['pod_diff_azi_m']+groupd['pod_diff_azi_mm']/1000
+                    groupd=groupd.drop(columns=['pod_diff_azi_mm'])
+                    esds.update(groupd)
             except:
                 print('some error with frame '+frame+'. Setting only -39 mm correction.')
                 ep = group[group.epochdate <= dt.datetime(2020,7,30).date() ]['pod_diff_azi_m']
