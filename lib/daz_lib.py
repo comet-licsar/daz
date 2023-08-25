@@ -643,9 +643,17 @@ def fix_pod_offset(esds, using_orbits = False):
         esds.update(ep.subtract(offset_px))
     else:
         print('warning, this functionality is ready only for LiCSAR environment')
-        from daz_lib_licsar import get_azioffs_old_new_POD
+        from daz_lib_licsar import get_azioffs_old_new_POD, get_daz_frame
         esds['pod_diff_azi_m'] = esds[col]*0
         for frame, group in esds.groupby('frame'):
+            # first check if there is any epoch to fix (maybe not?)
+            dazes = get_daz_frame(frame)
+            epochs = []
+            epochs = epochs + dazes[dazes['orbfile']==''].epoch.to_list()
+            epochs = epochs + dazes[dazes['orbfile']=='fixed_as_in_GRL'].epoch.to_list()
+            if not epochs:
+                print('Frame '+frame+' seems fully processed with new orbits. Skipping')
+                continue
             print('getting POD diffs for frame '+frame)
             epochs = group['epochdate'].to_numpy()
             try:
