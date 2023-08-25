@@ -725,6 +725,20 @@ def fix_oldorb_shift_oneoff(frame, tmpdir = '/work/scratch-pw3/licsar/earmla/tem
             print('some error with frame '+frame+', epoch '+str(epoch))
 
 
+def fix_oldorb_pds(framespd, esds):
+    """ Gets azimuth correction for all frames in framespd. Unfinished..
+    """
+    for frame in framespd.frame.values:
+        dazes = get_daz_frame(frame)
+        epochs = []
+        epochs = epochs + dazes[dazes['orbfile']==''].epoch.to_list()
+        epochs = epochs + dazes[dazes['orbfile']=='fixed_as_in_GRL'].epoch.to_list()  # this needs to be recorrected (+39)
+        # finally, need to find epochs where the correction is as rslc3, and correct them as well, plus other in the cascade.....
+        if epochs:
+            azispd = get_azioffs_old_new_POD(frame, epochs)
+    return esds
+
+
 def get_azioffs_old_new_POD(frame, epochs = None):
     """ Function to get correction for PODs established after 2020-07-31 in azimuth
     """
@@ -747,7 +761,7 @@ def get_azioffs_old_new_POD(frame, epochs = None):
         oldorb = oldorbs[0]
         if not oldorb:
             print('none old for '+str(epoch))
-            break
+            continue
         azioff = get_azi_diff_from_two_orbits(oldorb, neworb, timesample)
         selepochs.append(epoch)
         azioffs.append(azioff)
