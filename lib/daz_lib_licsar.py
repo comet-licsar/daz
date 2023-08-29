@@ -752,7 +752,7 @@ def get_azioffs_old_new_POD(frame, epochs = None):
     selepochs = []
     for epoch in epochs:
         if epoch > datelim:
-            break
+            continue
         epoch_s1ab = flag_s1b([epoch], master, master_s1ab, returnstr=True )[0]
         timesample = dt.datetime.combine(epoch, master.time())
         neworbs = get_orbit_filenames_for_datetime(timesample, 'POEORB', s1ab='S1'+epoch_s1ab)
