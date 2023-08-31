@@ -655,7 +655,8 @@ def fix_pod_offset(esds, using_orbits = False):
                 print('Frame '+frame+' seems fully processed with new orbits. Skipping')
                 continue
             print('getting POD diffs for frame '+frame)
-            epochs = group['epochdate'].to_numpy()
+            #epochs = group['epochdate'].to_numpy()  # for all epochs - but we don't need that!
+
             try:
                 fepazis = get_azioffs_old_new_POD(frame, epochs = epochs)
                 if not fepazis.empty:

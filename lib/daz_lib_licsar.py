@@ -739,6 +739,28 @@ def fix_oldorb_pds(framespd, esds):
     return esds
 
 
+def flag_old_new_POD(esds):
+    """ This will add new column: 'new_POD' with 0/1 where 1 means 'safe to use' as it uses orbits >2020/07/30"""
+    esds['new_POD'] = 0
+    for frame, group in esds.groupby('frame'):
+        # first check if there is any epoch to fix (maybe not?)
+        dazes = get_daz_frame(frame)
+        dazes = dazes[np.isin(dazes['epoch'], group['epochdate'])]
+        epochs = []
+        epochs = epochs + dazes[dazes['orbfile']==''].epoch.to_list()
+        epochs = epochs + dazes[dazes['orbfile']=='fixed_as_in_GRL'].epoch.to_list()
+        aa = pd.Series(epochs)
+        epochs = aa[aa < dt.datetime(2020, 7, 30).date()].to_list() # sometimes we have no info on POD used in the db..
+        lenep = 0
+        while len(epochs)>lenep:
+            epochs = epochs + dazes[np.isin(dazes['rslc3'], epochs)].epoch.to_list()
+            epochs = list(set(epochs))
+            lenep = len(epochs)
+        group[~np.isin(group['epochdate'], epochs)]['new_POD'] = 1
+        esds.update(group)
+    return esds
+
+
 def get_azioffs_old_new_POD(frame, epochs = None):
     """ Function to get correction for PODs established after 2020-07-31 in azimuth
     """
