@@ -3,6 +3,7 @@
 # general imports
 import pandas as pd
 import numpy as np
+import datetime as dt
 from scipy.constants import speed_of_light
 from scipy.constants import pi
 from scipy import signal
@@ -71,6 +72,20 @@ def EN2azi(N, E, heading = -169):
 #######################################
 # step 2 - get solid Earth tides
 ################### SOLID EARTH TIDES
+
+def get_SET_for_frame(frame, esds, framespd):
+    """ Updated function to get ENU solid earth tides for given frame.
+    Warning, this solution probably does not include corrections to leap seconds1
+    """
+    import pysolid
+    #lat, lon = 
+    #dt0 = # first epoch datetime
+    #dt1 = # last epoch datetime (plus few seconds)
+    step_sec = 6*24*3600 # 6 days, to capture S1A/B
+    #dtout, E, N, U = pysolid.calc_solid_earth_tides_point(lat, lon, dt0, dt1, step_sec=60)
+    # and then need to extract the data towards epochs, and diff with the reference epoch before returning
+    return True
+
 
 def get_tide_in_azimuth(lat, lon, hei, azi, time1):
     '''
@@ -562,6 +577,13 @@ def get_s1b_offset(epd, fpd, col = 'daz_mm_notide_noiono', fix_pod_offset = True
 
 
 def flag_s1b(epochdates, masterdate, mastersat = 'A', returnstr = False):
+    """
+    Args:
+        epochdates (list of dt.datetime.date)
+        masterdate (dt.datetime.date)
+        mastersat (str): 'A' or 'B'
+        returnstr (bool): if True, returns 'A' or 'B', otherwise returns 1 for 'B'
+    """
     if mastersat == 'B':
         masterdate = masterdate + pd.Timedelta('6 days')
     isB = []
@@ -601,19 +623,55 @@ def flag_s1b_esds(esds, framespd):
     return esds
 
 
-def fix_pod_offset(esds):
-    """Function to fix the 39 mm shift after new orbits in 2020-07-29/30
+def fix_pod_offset(esds, using_orbits = False):
+    """Function to fix the shift after new orbits in 2020-07-29/30, either using real POD diff if possible (if in LiCSAR), or applying 39 mm constant value.
     Args:
-        esds (pd.Dataframes)   as loaded (i.e. with the relevant daz columns)
+        esds (pd.Dataframe):   as loaded (i.e. with the relevant daz columns)
+        using_orbits (bool):    if True, it will try use directly PODs to find diff (only with daz_lib_licsar)
+    Returns:
+        pd.DataFrame :  original esds with applied correction
     """
     col='daz_total_wrt_orbits'
     #if 'S1AorB' not in esds.columns:
-    print('subtracting towards 2020-07-30')
     #ddate = pd.Timestamp('2020-07-30')
     #ep = esds[esds.epochdate < ddate][col]
-    ep = esds[esds.epoch < 20200730 ][col]
-    offset_px = 39/14000 #(framespd.azimuth_resolution.mean()*1000) # just a mean
-    esds.update(ep.subtract(offset_px))
+    if not using_orbits:
+        print('subtracting towards 2020-07-30')
+        #ep = esds[esds.epoch < 20200730 ][col]
+        ep = esds[esds.epochdate <= dt.datetime(2020,7,30).date() ][col]
+        offset_px = 39/14000 #(framespd.azimuth_resolution.mean()*1000) # just a mean
+        esds.update(ep.subtract(offset_px))
+    else:
+        print('warning, this functionality is ready only for LiCSAR environment')
+        from daz_lib_licsar import get_azioffs_old_new_POD, get_daz_frame
+        esds['pod_diff_azi_m'] = esds[col]*0
+        for frame, group in esds.groupby('frame'):
+            # first check if there is any epoch to fix (maybe not?)
+            dazes = get_daz_frame(frame)
+            epochs = []
+            epochs = epochs + dazes[dazes['orbfile']==''].epoch.to_list()
+            epochs = epochs + dazes[dazes['orbfile']=='fixed_as_in_GRL'].epoch.to_list()
+            if not epochs:
+                print('Frame '+frame+' seems fully processed with new orbits. Skipping')
+                continue
+            print('getting POD diffs for frame '+frame)
+            epochs = group['epochdate'].to_numpy()
+            try:
+                fepazis = get_azioffs_old_new_POD(frame, epochs = epochs)
+                if not fepazis.empty:
+                    # merge to group and then update esds
+                    groupd = group.copy(deep=True)
+                    groupd = groupd.merge(fepazis, how='inner', on='epochdate')
+                    groupd['pod_diff_azi_m']=groupd['pod_diff_azi_m']+groupd['pod_diff_azi_mm']/1000
+                    groupd=groupd.drop(columns=['pod_diff_azi_mm'])
+                    esds.update(groupd)
+            except:
+                print('some error with frame '+frame+'. Setting only -39 mm correction.')
+                ep = group[group.epochdate <= dt.datetime(2020,7,30).date() ]['pod_diff_azi_m']
+                offset_m = 0.039
+                esds.update(ep.subtract(offset_m))
+        print('Correcting the final values in esds dataset')
+        esds[col] = esds[col]+esds['pod_diff_azi_m']/14 # using directly 14 m resolution.. should be precise enough
     return esds
 
 

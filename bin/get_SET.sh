@@ -1,4 +1,5 @@
 #!/bin/bash
+# 2023-08-31: Muhammet Nergizci: improved vartype to keep using bc (faster than through calling python)
 # 2021-06-24
 # M Lazecky 2020, 2021
 # this is to get earth tides (bash):
@@ -59,6 +60,7 @@ for aline in `cat $in_frames | tail -n+2 `; do
       NE=`echo $etide | cut -d ',' -f2`
       EE=`echo $etide | cut -d ',' -f3`
       VE=`echo $etide | cut -d ',' -f4`
+      
       ##Convert scientific notation to decimal notation
       NE=$(printf "%.12f" "$NE")
       EE=$(printf "%.12f" "$EE")

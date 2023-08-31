@@ -6,16 +6,63 @@ from LiCSAR_lib.LiCSAR_misc import *
 import os, glob
 import pandas as pd
 import framecare as fc
+try:
+    from orbit_lib import *
+except:
+    print('LiCSAR orbit_lib not found, cannot process orbit files')
 
-# maybe not needed?
+
 from daz_lib import *
 
 
-# e.g.
-# framelist=pd.read_csv('frames.txt'); framelist=list(framelist.frame)
-# where you may get frames.txt e.g. by:
-# cd $LiCSAR_procdir
-# for tr in `seq 1 175`; do for f in `ls $tr`; do m=`ls $tr/$f/SLC | head -n1`; hgtfile=$LiCSAR_public/$tr/$f/metadata/$f'.geo.hgt.tif'; ll=`gdalinfo $hgtfile | grep ^Center`; lon=`echo $ll | cut -d "," -f1 | cut -d '(' -f2`; lat=`echo $ll | cut -d ")" -f1 | cut -d ',' -f2`; echo $f","$m","$lon","$lat >> $outfr;  done;done
+def extract_all2txt(outfr = 'frames.txt', outdaz = 'esds.txt'):
+    """ Main function to extract all frame and daz data from the LiCSAR database.
+    """
+    frames = create_framelist(outfr)
+    extract2txt_esds_all_frames(framelist = frames, outfile=outdaz)
+    print('done, please continue by daz_01_prepare_inputs.py')
+
+
+def create_framelist(outfile='frames.txt'):
+    """ Creates frames.txt for all frames in LiCSInfo that contains table in:
+    frame,master,center_lon,center_lat
+    """
+    framespd = fc.get_all_frames(only_initialised = True, merge = True)
+    # get lons,lats:
+    c=framespd.geometry.centroid
+    lons = []
+    lats = []
+    for cc in c:
+        lons.append(cc.coords[0][0])
+        lats.append(cc.coords[0][1])
+    # get masters:
+    masters = []
+    for frame in framespd.frameID:
+        masters.append(fc.get_master(frame))
+    framespd['frame'] = framespd['frameID']
+    framespd['master'] = masters
+    framespd['center_lon'] = lons
+    framespd['center_lat'] = lats
+    framespd = framespd.drop(columns=['geometry', 'frameID'])
+    framespd.to_csv(outfile, index=False)
+    return list(framespd.frame)
+
+'''
+e.g.
+framelist=pd.read_csv('frames.txt'); framelist=list(framelist.frame)
+
+where you may get frames.txt using the function create_framelist(), or using the previous code:
+cd $LiCSAR_procdir
+for tr in `seq 1 175`; do for f in `ls $tr`; do
+  m=`ls $tr/$f/SLC | head -n1`; 
+  hgtfile=$LiCSAR_public/$tr/$f/metadata/$f'.geo.hgt.tif'; 
+  ll=`gdalinfo $hgtfile | grep ^Center`; 
+  lon=`echo $ll | cut -d "," -f1 | cut -d '(' -f2`; 
+  lat=`echo $ll | cut -d ")" -f1 | cut -d ',' -f2`; 
+  echo $f","$m","$lon","$lat >> $outfr;  
+done;done
+'''
+
 def extract2txt_esds_all_frames(framelist, outfile='esds.txt'):
     dazes=pd.DataFrame()
     for frame in framelist:
@@ -425,7 +472,7 @@ def fix_oldorb_update_off(offile, azshiftm=-0.039, returnval = False):
     # get previous estimate from off file
     azioffset = float(grep1line('azimuth_offset_polynomial', offile).split()[1])
     azshiftpx = azshiftm/aziorigres
-    # should be -39 mm here to fit the RDC-resampled data.. checking now
+    # should be -39 mm here to fit the RDC-resampled data (although directly using POD would give better estimate)
     aziok = azioffset + azshiftpx
     # get it back to the off file
     oldstr='azimuth_offset_polynomial.*'
@@ -676,6 +723,55 @@ def fix_oldorb_shift_oneoff(frame, tmpdir = '/work/scratch-pw3/licsar/earmla/tem
             rc = update_esd(frame, epoch, colupdate = 'daz', valupdate = newazishift)
         except:
             print('some error with frame '+frame+', epoch '+str(epoch))
+
+
+def fix_oldorb_pds(framespd, esds):
+    """ Gets azimuth correction for all frames in framespd. Unfinished..
+    """
+    for frame in framespd.frame.values:
+        dazes = get_daz_frame(frame)
+        epochs = []
+        epochs = epochs + dazes[dazes['orbfile']==''].epoch.to_list()
+        epochs = epochs + dazes[dazes['orbfile']=='fixed_as_in_GRL'].epoch.to_list()  # this needs to be recorrected (+39)
+        # finally, need to find epochs where the correction is as rslc3, and correct them as well, plus other in the cascade.....
+        if epochs:
+            azispd = get_azioffs_old_new_POD(frame, epochs)
+    return esds
+
+
+def get_azioffs_old_new_POD(frame, epochs = None):
+    """ Function to get correction for PODs established after 2020-07-31 in azimuth
+    """
+    print('getting old/new POD difference corrections for frame '+frame)
+    datelim = dt.datetime(2020,7,31).date()
+    if type(epochs) == type(None):
+        epochs = fc.get_epochs(frame, return_as_dt=True) #2018-09-01
+    master_s1ab = get_frame_master_s1ab(frame)
+    master = fc.get_master(frame, asdatetime = True)
+    azioffs = []
+    selepochs = []
+    for epoch in epochs:
+        if epoch > datelim:
+            continue
+        epoch_s1ab = flag_s1b([epoch], master, master_s1ab, returnstr=True )[0]
+        timesample = dt.datetime.combine(epoch, master.time())
+        neworbs = get_orbit_filenames_for_datetime(timesample, 'POEORB', s1ab='S1'+epoch_s1ab)
+        oldorbs = getoldorbpath(neworbs)
+        neworb = neworbs[0]
+        oldorb = oldorbs[0]
+        if not oldorb:
+            print('none old for '+str(epoch))
+            continue
+        azioff = get_azi_diff_from_two_orbits(oldorb, neworb, timesample)
+        selepochs.append(epoch)
+        azioffs.append(azioff)
+    if not selepochs:
+        print('no epoch was selected for correction')
+        return False
+    selazis = np.array(azioffs) *1000
+    azispd = pd.DataFrame({'epochdate': selepochs,
+     'pod_diff_azi_mm': selazis})
+    return azispd
 
 
 

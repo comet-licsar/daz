@@ -13,20 +13,30 @@ except:
 import nvector as nv
 import iri2016
 import pyproj
-
+import numpy as np
+import re
 
 
 
 # get daz iono
 ################### IONOSPHERE 
 
-def extract_iono_full(esds, framespd):
+def extract_iono_full(esds, framespd, ionosource = 'iri'):
+    """ Full extraction of ionospheric effect from ionosource.
+    Note this will create column with the phase advanced effect recalculated to apparent azimuth offset [mm] that has opposite sign.
+    Therefore this conforms the GRL article and you can subtract this correction from the original values, as usual.
+    
+    Args:
+        ionosource (str):   either 'iri' or 'code'
+    Returns:
+        esds, framespd
+    """
     # estimating the ionosphere - takes long (several hours)
     # also, storing TECS values (i.e. TEC in slant direction, from IRI2016)
     esds['tecs_A'] = 0.0
     esds['tecs_B'] = 0.0
-    esds['daz_iono_grad_mm'] = 0.0
-    esds['daz_mm_notide_noiono_grad'] = 0.0
+    esds['daz_iono_mm'] = 0.0
+    #esds['daz_mm_notide_noiono_grad'] = 0.0
     framespd['Hiono'] = 0.0
     framespd['Hiono_std'] = 0.0
     framespd['Hiono_range'] = 0.0
@@ -38,17 +48,19 @@ def extract_iono_full(esds, framespd):
         try:
             #daz_iono_with_F2 = calculate_daz_iono(frame, esds, framespd)
             #daz_iono_grad, hionos, tecs_A_master, tecs_B_master = calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = True, out_tec_master = True)
-            daz_iono_grad, hionos, tecs_A_master, tecs_B_master, tecs_A, tecs_B = calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = True, out_tec_all = True)
+            daz_iono_grad, hionos, tecs_A_master, tecs_B_master, tecs_A, tecs_B = calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = True, out_tec_all = True, ionosource=ionosource)
             hiono = np.mean(hionos)
             hiono_std = np.std(hionos)
         except:
-            print('some error occurred here')
+            print('some error occurred extracting TEC(s) here')
             continue
         selesds=esds[esds['frame']==frame].copy()
-        selesds['daz_iono_grad_mm'] = daz_iono_grad*resolution*1000
+        # 2023/08: changing sign to keep consistent with the GRL article
+        selesds['daz_iono_mm'] = -1*daz_iono_grad*resolution*1000
         selesds['tecs_A'] = tecs_A
         selesds['tecs_B'] = tecs_B
-        selesds['daz_mm_notide_noiono_grad'] = selesds['daz_mm_notide'] + selesds['daz_iono_grad_mm'] #*resolution*1000
+        # skipping the correction here, since daz_mm_notide might not exist/not needed:
+        #selesds['daz_mm_notide_noiono_grad'] = selesds['daz_mm_notide'] + selesds['daz_iono_grad_mm'] #*resolution*1000
         esds.update(selesds)
         framespd.at[framespd[framespd['frame']==frame].index[0], 'Hiono'] = hiono
         framespd.at[framespd[framespd['frame']==frame].index[0], 'Hiono_std'] = hiono_std
@@ -63,21 +75,320 @@ def extract_iono_full(esds, framespd):
 # step 3 - get daz iono
 ################### IONOSPHERE 
 
-def get_tecs(glat, glon, altitude, acq_times, returnhei = False):
+def get_tecs(glat, glon, altitude, acq_times, returnhei = False, source='iri', alpha = 0.85):
+    '''Gets estimated TEC over given point, up to given altitude
+    
+    Args:
+        glat, glon, altitude: coordinates and max 'iono height' to get the TEC values for. Altitude is in km
+        acq_times (list of dt.datetime): time stamps to get the TEC over the given point
+        returnhei (boolean):  if True, it would return TEC values but also estimated F2 peak heights (from IRI)
+        source (str): source of TEC - either 'iri' for IRI2016 model (must be installed), or 'code' to autodownload from CODE
+        alpha (float): for CODE only, estimate of ratio of TEC towards 'to the satellite only'. If 'auto', it will estimate it using iri. 0.85 is good value
     '''
-    here, the altitude is the satellite altitude (max iono height) to check...
-    '''
+    if returnhei and source == 'code':
+        print('WARNING, height is estimated only through IRI model, now setting to it')
+        source = 'iri'
+    if alpha == 'auto':
+        getalpha=True
+    else:
+        getalpha=False
     altkmrange = [0, altitude, altitude]
     TECs = []
     heis = []
     for acqtime in acq_times:
-        iri_acq = iri2016.IRI(acqtime, altkmrange, glat, glon )
-        TECs.append(iri_acq.TEC.values[0])
-        heis.append(iri_acq.hmF2.values[0])
+        if source == 'iri':
+            iri_acq = iri2016.IRI(acqtime, altkmrange, glat, glon )
+            TECs.append(iri_acq.TEC.values[0])
+            heis.append(iri_acq.hmF2.values[0])
+        elif source == 'code':
+            if getalpha:
+                iri_acq_gps = iri2016.IRI(acqtime, [0, 20000, 20000], glat, glon )
+                iri_acq = iri2016.IRI(acqtime, altkmrange, glat, glon )
+                alpha = float(iri_acq.TEC/iri_acq_gps.TEC)
+            try:
+                tec = get_vtec_from_code(acqtime, glat, glon)
+            except:
+                # CODE data is not available earlier than with 6 months delay.. or more?
+                tec = 0
+                print('No CODE data for date '+str(acqtime.date())+'. Setting zero.')
+            # decrease the value by some alpha... we expect alpha % of TEC being below the satellite.. should be improved
+            #alpha = 0.85
+            tec = alpha*tec
+            TECs.append(tec)
     if returnhei:
         return TECs, heis
     else:
         return TECs
+
+try:
+    import wget
+    #import zlib
+    from LiCSAR_misc import grep1line
+except:
+    print('error loading libraries to use of CODE (either wget or LiCSAR_misc). Use of CODE will fail')
+
+
+def get_vtec_from_code(acqtime, lat = 0, lon = 0, storedir = '/gws/nopw/j04/nceo_geohazards_vol1/code_iono', return_fullxr = False):
+    """ Adapted from Reza Bordbari script, plus using functions from https://notebook.community/daniestevez/jupyter_notebooks/IONEX
+
+    Args:
+        acqtime (dt.datetime)
+        lat (float)
+        lon (float)
+        storedir (str)
+        return_fullxr (bool): if True, will return full TEC datacube
+    """
+    #D = acqtime.strftime('%Y%m%d')
+    #ipp = np.array([lat,lon])
+    filename = 'CODG' + acqtime.strftime('%j') + '0.' + acqtime.strftime('%y')+ 'I.Z'
+    url = 'http://ftp.aiub.unibe.ch/CODE/' + acqtime.strftime('%Y') + '/' + filename
+    fullpath = os.path.join(storedir,filename)
+    ionix = fullpath[:-2]
+    if not os.path.exists(ionix):
+        if not os.path.exists(fullpath):
+            # download this
+            wget.download(url, out=storedir)
+    #try:
+        #    object1 = open(fullpath, 'rb').read()
+        #    ionix = zlib.decompress(object1)  # does not work!!!
+    if not os.path.exists(ionix):
+        rc = os.system('cd '+storedir+'; 7za x '+filename+' >/dev/null 2>/dev/null; rm '+fullpath)
+    if not os.path.exists(ionix):
+        print('ERROR: maybe you do not have 7za installed')
+        return False
+    #else:
+    #    rc=os.system('rm '+fullpath) # clean the .Z
+    # prep 
+    #hhmmss=acqtime.strftime('%H%M%S')
+    # loading the TEC maps, thanks to https://notebook.community/daniestevez/jupyter_notebooks/IONEX (but improved towards xarray by ML B-)
+    tecmaps = get_tecmaps(ionix)
+    interval = int(grep1line('INTERVAL',ionix).split()[0])
+    timestep = interval/3600
+    timecoords = np.arange(0.0,24.0+timestep,timestep)  # we expect start/end time being midnight, should be standard for all CODE files?
+    lat_all = np.arange(87.5,-87.5-2.5,-2.5)
+    lon_all = np.arange(-180.0,180.0+5,5.0)
+    tecxr = xr.DataArray(data=tecmaps, dims=['time','lat','lon'],
+                        coords=dict(time=timecoords, lon=lon_all, lat=lat_all) )
+    # interpolate through the nan values
+    tonan=9999
+    tecxr.where(tecxr!=tonan)
+    tecxr=tecxr.interpolate_na(dim="lon", method="linear", fill_value="extrapolate")
+    tecxr = tecxr*1e+16 # from TECU
+    if return_fullxr:
+        return tecxr
+    else:
+        return get_vtec_from_tecxr(tecxr, acqtime, lat, lon)
+
+
+# get_vtec_from_code(acqtime, lat, lon, storedir = '/gws/nopw/j04/nceo_geohazards_vol1/code_iono', return_fullxr = False):
+def get_vtec_from_tecxr(tecxr, acqtime, lat, lon, rotate=True):
+    '''Function to be used with tecxr (output from get_vtec_from_code) to get the tec for given coords'''
+    h_time = float(acqtime.strftime('%H'))
+    m_time = float(acqtime.strftime('%M'))
+    s_time = float(acqtime.strftime('%S'))
+    # given time in decimal format
+    time_dec = h_time + (m_time/60) + (s_time / 3600)
+    # ML: 2023/08, based on : https://github.com/insarlab/MintPy/blob/main/src/mintpy/objects/ionex.py
+    # that is actually based on
+    # Schaer, S., Gurtner, W., & Feltens, J. (1998). IONEX: The ionosphere map exchange format
+    #         version 1.1. Paper presented at the Proceedings of the IGS AC workshop, Darmstadt, Germany.
+    if rotate:
+        # 3D interpolation with rotation as above reference
+        htimes = tecxr.time.values
+        pretime = int(htimes[htimes <= time_dec][-1])
+        postime = int(htimes[htimes >= time_dec][0])
+        #
+        lon0 = lon + (time_dec - pretime) * 360. / 24.
+        lon1 = lon + (time_dec - postime) * 360. / 24.
+        #
+        tec_val0 = float(tecxr.interp(time=pretime, lon=lon0, lat=lat, method='linear'))
+        tec_val1 = float(tecxr.interp(time=postime, lon=lon1, lat=lat, method='linear'))
+        #
+        tec = ((postime - time_dec) / (postime - pretime) * tec_val0
+                   + (time_dec - pretime) / (postime - pretime) * tec_val1)
+    else:
+        # previous attempt, but still too different from the S1_ETAD CODE outputs (that rotates the Earth towards the Sun..)
+        tec = float(tecxr.interp(time=time_dec, lon=lon,lat=lat, method='cubic')) # should be better than linear, but maybe quadratic is more suitable?
+    return tec
+
+
+def parse_map(tecmap, exponent = -1):
+    tecmap = re.split('.*END OF TEC MAP', tecmap)[0]
+    return np.stack([np.fromstring(l, sep=' ') for l in re.split('.*LAT/LON1/LON2/DLON/H\\n',tecmap)[1:]])*10**exponent
+
+
+def get_tecmaps(filename):
+    exponent = int(grep1line('EXPONENT',filename).split()[0]) # this is exponent of the data
+    with open(filename) as f:
+        ionex = f.read()
+        return [parse_map(t, exponent) for t in ionex.split('START OF TEC MAP')[1:]]
+
+
+def get_tec(tecmap, lat, lon):
+    i = round((87.5 - lat)*(tecmap.shape[0]-1)/(2*87.5))
+    j = round((180 + lon)*(tecmap.shape[1]-1)/360)
+    return tecmap[i,j]
+
+
+
+
+
+
+
+'''
+
+Reza's code (after attempt to convert mat2python - sorry for ugliness here, ML)
+def get_vtec_from_code(yyyymmdd = None,day_of_year = None,hhmmss = None,ipp_lat = None,ipp_lon = None): 
+    ipp = np.array([ipp_lat,ipp_lon])
+    D = num2str(yyyymmdd)
+    fullDate = np.array([[str2double(D(np.arange(1,4+1)))],[str2double(D(np.arange(5,6+1)))],[str2double(D(np.arange(7,8+1)))]])
+    url = 'http://ftp.aiub.unibe.ch/CODE/' + string(fullDate(1)) + '/' + 'CODG' + string(day_of_year * 10) + '.' + D(np.arange(3,4+1)) + 'I.Z'
+    code_zip = 'CODG' + string(day_of_year * 10) + '.' + D(np.arange(3,4+1)) + 'I.Z'
+    ionix = 'CODG' + string(day_of_year * 10) + '.' + D(np.arange(3,4+1)) + 'I'
+    try:
+        zipFile = websave(code_zip,url)
+        # the URL was found if you get here.  If not, it goes to the catch.
+        print('SUCCESS: Downloaded %s to %s \n' % (url,zipFile))
+        command = sprintf('uncompress %s',code_zip)
+        system(command)
+    finally:
+        pass
+    
+    # Data acquisition time
+    T = num2str(hhmmss)
+    h_time = str2double(T(np.arange(1,2+1)))
+    m_time = str2double(T(np.arange(3,4+1)))
+    s_time = str2double(T(np.arange(5,6+1)))
+    # given time in decimal format
+    min_temp = m_time / 60
+    time_dec = h_time + min_temp + (s_time / 3600)
+    time_sec = (h_time * 3600) + (m_time * 60) + s_time
+    # all the grid points for time
+    time_all = np.arange(0,24+1,1)
+    # find the 2 closest time indices
+    time_sort = np.array([h_time,h_time + 1])
+    # longitude modification
+    we = 360 / (24 * 60 * 60)
+    
+    lon_ipp_1 = ipp(2) + (time_sec - (time_sort(1) * 3600)) * we
+    lon_ipp_2 = ipp(2) + (time_sec - (time_sort(2) * 3600)) * we
+    ## (3) Time and coordinate interpolation
+# (3-1) Find indices of the two adjacent TEC maps in latitude
+# find coordinates (lat,lon) of the all grid points
+    lat_all = np.arange(87.5,- 87.5+- 2.5,- 2.5)
+    # find the 2 closest latitude indices
+    __,ind_lat = __builtint__.sorted(np.abs(ipp(1) - lat_all),'ascend')
+    ind_lat_int = __builtint__.sorted(ind_lat(np.arange(1,2+1)),'ascend')
+    # (3-2) Reading IONEX file
+    lat_sort,iLat = __builtint__.sorted(lat_all(ind_lat_int),'descend')
+    # title of the Global IONEX file (ex. http://ftp.aiub.unibe.ch/CODE/2020/)
+    IONEXFile = ionix
+    latBlock1_t1,latBlock2_t1,latBlock1_t2,latBlock2_t2 = get_lat_block(IONEXFile,fullDate,time_dec,time_sort,lat_sort)
+    # (3-3) Bilinear interpolation (interpolation in lat, long, time)
+# theory is based on: https://www.omnicalculator.com/math/bilinear-interpolation
+    
+    lon_all = np.arange(- 180,180+5,5)
+    # epoch one
+# find the 2 closest longitude indices (based on the 1st modified IPP longitude)
+    __,ind_lon = __builtint__.sorted(np.abs(lon_ipp_1 - lon_all),'ascend')
+    ind_lon_int = __builtint__.sorted(ind_lon(np.arange(1,2+1)),'ascend')
+    lon_sort,iLon = __builtint__.sorted(lon_all(ind_lon_int),'ascend')
+    # interpolation coefficients
+    ylat = np.array([[lat_sort(1) - ipp(1)],[ipp(1) - lat_sort(2)]])
+    xlon = np.array([lon_sort(2) - lon_ipp_1,lon_ipp_1 - lon_sort(1)])
+    r = 1 / ((lon_sort(2) - lon_sort(1)) * (lat_sort(1) - lat_sort(2)))
+    # vTEC values
+    Q1 = np.array([latBlock2_t1(ind_lon_int(iLon(1))),latBlock1_t1(ind_lon_int(iLon(1))),latBlock2_t1(ind_lon_int(iLon(2))),latBlock1_t1(ind_lon_int(iLon(2)))])
+    # interpolated vTEC for epoch one
+    vTec_t1 = r * xlon * Q1 * ylat
+    clear('ylat','xlon','ind_lon','ind_lon_int','lon_sort','iLon')
+    # epoch two
+# find the 2 closest longitude indices (based on the 2nd modified IPP longitude)
+    __,ind_lon = __builtint__.sorted(np.abs(lon_ipp_2 - lon_all),'ascend')
+    ind_lon_int = __builtint__.sorted(ind_lon(np.arange(1,2+1)),'ascend')
+    lon_sort,iLon = __builtint__.sorted(lon_all(ind_lon_int),'ascend')
+    # interpolation coefficients
+    ylat = np.array([[lat_sort(1) - ipp(1)],[ipp(1) - lat_sort(2)]])
+    xlon = np.array([lon_sort(2) - lon_ipp_2,lon_ipp_2 - lon_sort(1)])
+    r = 1 / ((lon_sort(2) - lon_sort(1)) * (lat_sort(1) - lat_sort(2)))
+    # vTEC values
+    Q2 = np.array([latBlock2_t2(ind_lon_int(iLon(1))),latBlock1_t2(ind_lon_int(iLon(1))),latBlock2_t2(ind_lon_int(iLon(2))),latBlock1_t2(ind_lon_int(iLon(2)))])
+    # interpolated vTEC for epoch two
+    vTec_t2 = r * xlon * Q2 * ylat
+    # interpolation in time
+    vTec = ((time_sort(2) - time_dec) * vTec_t1) + ((time_dec - time_sort(1)) * vTec_t2)
+    return vTec
+    
+    return vTec# Reza Bordbari
+# This script selects the appropriate latitude block in the Rinex file
+
+'''
+
+def get_lat_block(IONEXFile = None,fullDate = None,time_dec = None,time_sort = None,lat_sort = None): 
+    fullDate1 = fullDate
+    if time_dec > 23:
+        time_sort[2] = 0
+        fullDate2 = fullDate + np.array([[0],[0],[1]])
+    else:
+        fullDate2 = fullDate
+    
+    # number of lines in the IONEX file.
+    NoL = CalcNumOfLines(IONEXFile)
+    # find the epochs and the two latitude blocks per epoch
+    DataFile = open(IONEXFile,'r')
+    fseek(DataFile,0,'bof')
+    tline = fgetl(DataFile)
+    for i in np.arange(1,NoL+1).reshape(-1):
+        # epoch one
+        e1 = strfind(tline,np.array([num2str(transpose(np.array([[fullDate1],[time_sort(1)],[0],[0]]))),'                        ','EPOCH OF CURRENT MAP']))
+        if not (len(e1)==0) :
+            condition = 1
+            while condition == 1:
+                # lat one
+                l1 = strfind(tline,np.array([num2str(lat_sort(1),'%.1f'),'-180.0 180.0   5.0 450.0']))
+                if not (len(l1)==0) :
+                    a = fgetl(DataFile)
+                    b = a
+                    for j in np.arange(1,4+1).reshape(-1):
+                        b = append(b,fgetl(DataFile))
+                    latBlock1_t1 = str2num(b)
+                tline = fgetl(DataFile)
+                # lat two
+                l2 = strfind(tline,np.array([num2str(lat_sort(2),'%.1f'),'-180.0 180.0   5.0 450.0']))
+                if not (len(l2)==0) :
+                    a = fgetl(DataFile)
+                    b = a
+                    for j in np.arange(1,4+1).reshape(-1):
+                        b = append(b,fgetl(DataFile))
+                    latBlock2_t1 = str2num(b)
+                    condition = 2
+        # epoch two
+        e2 = strfind(tline,np.array([num2str(transpose(np.array([[fullDate2],[time_sort(2)],[0],[0]]))),'                        ','EPOCH OF CURRENT MAP']))
+        if not (len(e2)==0) :
+            condition = 1
+            while condition == 1:
+                # lat one
+                l1 = strfind(tline,np.array([num2str(lat_sort(1),'%.1f'),'-180.0 180.0   5.0 450.0']))
+                if not (len(l1)==0) :
+                    a = fgetl(DataFile)
+                    b = a
+                    for j in np.arange(1,4+1).reshape(-1):
+                        b = append(b,fgetl(DataFile))
+                    latBlock1_t2 = str2num(b)
+                clear('a','b','j')
+                tline = fgetl(DataFile)
+                # lat two
+                l2 = strfind(tline,np.array([num2str(lat_sort(2),'%.1f'),'-180.0 180.0   5.0 450.0']))
+                if not (len(l2)==0) :
+                    a = fgetl(DataFile)
+                    b = a
+                    for j in np.arange(1,4+1).reshape(-1):
+                        b = append(b,fgetl(DataFile))
+                    latBlock2_t2 = str2num(b)
+                    condition = 2
+            break
+        tline = fgetl(DataFile)
+    return latBlock1_t1,latBlock2_t1,latBlock1_t2,latBlock2_t2
 
 
 #get satellite position - ECEF
@@ -171,9 +482,11 @@ def get_abs_iono_corr(frame,esds,framespd):
     return daz_iono
 '''
 
-def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = False, out_tec_master = False, out_tec_all = False):
+def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = False, out_tec_master = False, out_tec_all = False, ionosource='iri'):
     '''
     use method either 'gomba' - only gradient, or 'liang' that includes also some extra F2 height correction..
+    2023/08: Liang method was first implemented here and a lot happened since that time.. Please consider it obsolete.
+    We should remove stating 'gomba' as well, since the correction is not really following his work any more (but indeed, his article was great init)
     '''
     selected_frame_esds = esds[esds['frame'] == frame].copy()
     frameta = framespd[framespd['frame']==frame]
@@ -211,7 +524,8 @@ def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = Fal
     except:
         scene_alt = 0
     #to get position of the satellite - UNCLEAR about slantRange - is this w.r.t. DEM? (should ask GAMMA) - if not (only in WGS-84), i should use scene_alt=0!
-    x, y, z = aer2ecef(azimuthDeg, elevationDeg, slantRange, scene_center_lat, scene_center_lon, scene_alt)
+    # 2023/08: checked using orbits - the slantranfe is wrt ellipsoid! setting scene alt 0
+    x, y, z = aer2ecef(azimuthDeg, elevationDeg, slantRange, scene_center_lat, scene_center_lon, 0) #scene_alt)
     satg_lat, satg_lon, sat_alt = ecef2latlonhei(x, y, z)
     Psatg = wgs84.GeoPoint(latitude=satg_lat, longitude=satg_lon, degrees=True)
     # get middle point between scene and sat - and get F2 height for it
@@ -239,7 +553,7 @@ def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = Fal
         # range_IPP = hiono/np.sin(theta)
         # but maybe not... let's do it simpler:
         range_IPP = slantRange * hiono / sat_alt
-        x, y, z = aer2ecef(azimuthDeg, elevationDeg, range_IPP, scene_center_lat, scene_center_lon, scene_alt)
+        x, y, z = aer2ecef(azimuthDeg, elevationDeg, range_IPP, scene_center_lat, scene_center_lon, 0) #scene_alt)
         ippg_lat, ippg_lon, ipp_alt = ecef2latlonhei(x, y, z)
         Pippg = wgs84.GeoPoint(latitude=ippg_lat, longitude=ippg_lon, degrees=True)
         # then get A', B'
@@ -255,8 +569,8 @@ def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = Fal
         PippA = path_ipp.intersect(path_scene_satgA).to_geo_point()
         PippB = path_ipp.intersect(path_scene_satgB).to_geo_point()
         ######### get TECS for A, B
-        TECV_A = get_tecs(PippA.latitude_deg, PippA.longitude_deg, round(sat_alt/1000), [epochdate], False)[0]
-        TECV_B = get_tecs(PippB.latitude_deg, PippB.longitude_deg, round(sat_alt/1000), [epochdate], False)[0]
+        TECV_A = get_tecs(PippA.latitude_deg, PippA.longitude_deg, round(sat_alt/1000), [epochdate], False, source=ionosource)[0]
+        TECV_B = get_tecs(PippB.latitude_deg, PippB.longitude_deg, round(sat_alt/1000), [epochdate], False, source=ionosource)[0]
         # get inc angle at IPP - see iono. single layer model function
         earth_radius = 6378160 # m
         sin_thetaiono = earth_radius/(earth_radius+hiono) * np.sin(theta)

@@ -2,7 +2,7 @@
 """
 v1.0 2022-01-03 Milan Lazecky, Leeds Uni
 
-This script will extract ionosphere shifts using IRI2016 model.
+This script will extract ionosphere shifts using either IRI2016 model or the CODE dataset.
 
 ===============
 Input & output files
@@ -11,7 +11,7 @@ Inputs :
  - frames.csv - contains data with heading:
 frame,master,center_lon,center_lat,heading,azimuth_resolution,avg_incidence_angle,centre_range_m,centre_time,dfDC
  - esds.csv - contains data with heading:
-,frame,orbits_precision,daz_tide_mm,epochdate,daz_mm,years_since_beginning,daz_mm_notide
+,frame,orbits_precision,epochdate,daz_mm,years_since_beginning[,daz_tide_mm,daz_mm_notide]
 
 Outputs :
  - esds_with_iono.csv - added iono columns
@@ -20,12 +20,15 @@ Outputs :
 =====
 Usage
 =====
-daz_03_extract_iono.py [--indaz esds.csv] [--infra frames.csv] [--outfra frames_with_iono.csv] [--outdaz esds_with_iono.csv]
+daz_03_extract_iono.py [--indaz esds.csv] [--use_code] [--infra frames.csv] [--outfra frames_with_iono.csv] [--outdaz esds_with_iono.csv]
 
-
+Notes:
+    --use_code  Will apply CODE to get TEC values rather than the default IRI2016 estimates. Note IRI2016 is still used to estimate iono peak altitude. Tested only in LiCSAR environment.
 """
 #%% Change log
 '''
+v1.1 2023-08-10 Milan Lazecky, UoL
+ - added option to get iono correction from CODE (combined with IRI2016 to estimate iono F2 peak altitude)
 v1.0 2022-01-03 Milan Lazecky, Uni of Leeds
  - Original implementation - based on codes from 2021-06-24
 '''
@@ -52,17 +55,21 @@ def main(argv=None):
     inframesfile = 'frames.csv'
     outdazfile = 'esds_with_iono.csv'
     outframesfile = 'frames_with_iono.csv'
-    
+    ionosource = 'iri'
+
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "h", ["help", "indaz =", "infra =", "outdaz =", "outfra ="])
+            opts, args = getopt.getopt(argv[1:], "h", ["help", "use_code", "indaz=", "infra=", "outdaz=", "outfra="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
             if o == '-h' or o == '--help':
                 print(__doc__)
                 return 0
+            if o == '--use_code':
+                ionosource = 'code'
+                print('using CODE for iono correction - note only data older than 6 months will have the CODE data available (rest=0)')
             elif o == "--indaz":
                 indazfile = a
             elif o == "--infra":
@@ -94,7 +101,15 @@ def main(argv=None):
     print('extra data cleaning step - perhaps should add to another step (first?)')
     esds, framespd = df_preprepare_esds(esds, framespd, firstdate = '', countlimit = 25)
     print('performing the iono calculation')
-    esds, framespd = extract_iono_full(esds, framespd)
+    esds, framespd = extract_iono_full(esds, framespd, ionosource = ionosource)
+    if 'daz_mm_notide' in esds:
+        col = 'daz_mm_notide'
+    else:
+        col = 'daz_mm'
+    try:
+        esds[col+'_noiono'] = esds[col] - esds['daz_iono_mm'] # 2023/08: changed sign to keep consistent with the GRL article
+    except:
+        print('probably a bug, please check column names - in any case, the correction is stored as daz_iono_mm column')
     '''
     if not parallel:
         esds, framespd = extract_iono_full(esds, framespd)
