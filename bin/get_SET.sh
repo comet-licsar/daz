@@ -1,4 +1,5 @@
 #!/bin/bash
+# 2023-08-31: Muhammet Nergizci: improved vartype to keep using bc (faster than through calling python)
 # 2021-06-24
 # M Lazecky 2020, 2021
 # this is to get earth tides (bash):
@@ -44,6 +45,11 @@ for aline in `cat $in_frames | tail -n+2 `; do
      NM=`echo $mtide | cut -d ',' -f2`
      EM=`echo $mtide | cut -d ',' -f3`
      VM=`echo $mtide | cut -d ',' -f4`
+     ##Convert scientific notation to decimal notation (e.g. e^3 to 0.001)
+     NM=$(printf "%.12f" "$NM")
+     EM=$(printf "%.12f" "$EM")
+     VM=$(printf "%.12f" "$VM")
+     
      
      for eline in `grep ^$frame $in_esds`; do
       #epochdate=`echo $eline | cut -d ',' -f2`
@@ -54,12 +60,18 @@ for aline in `cat $in_frames | tail -n+2 `; do
       NE=`echo $etide | cut -d ',' -f2`
       EE=`echo $etide | cut -d ',' -f3`
       VE=`echo $etide | cut -d ',' -f4`
-      #U=`echo '('$VE')-('$VM')' | bc`
-      #E=`echo '('$EE')-('$EM')' | bc`
-      #N=`echo '('$NE')-('$NM')' | bc`
-      U=`python3 -c "print(("$VE")-("$VM"))"`
-      E=`python3 -c "print(("$EE")-("$EM"))"`
-      N=`python3 -c "print(("$NE")-("$NM"))"`
+      
+      ##Convert scientific notation to decimal notation
+      NE=$(printf "%.12f" "$NE")
+      EE=$(printf "%.12f" "$EE")
+      VE=$(printf "%.12f" "$VE")
+      
+      U=`echo '('$VE')-('$VM')' | bc`
+      E=`echo '('$EE')-('$EM')' | bc`
+      N=`echo '('$NE')-('$NM')' | bc`
+      #U=`python3 -c "print(("$VE")-("$VM"))"`
+      #E=`python3 -c "print(("$EE")-("$EM"))"`
+      #N=`python3 -c "print(("$NE")-("$NM"))"`
       echo $frame","$epochdate","$E","$N","$U >> $out_SET
      done
   fi
