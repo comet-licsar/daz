@@ -17,17 +17,20 @@ frame,esd_master,epoch,daz_total_wrt_orbits,daz_cc_wrt_orbits,orbits_precision,v
 Outputs :
  - frames.csv - contains data with heading:
 frame,master,center_lon,center_lat,heading,azimuth_resolution,avg_incidence_angle,centre_range_m,centre_time,dfDC
- - esds.txt - same as before, but would be corrected for the 39 mm shift between datasets pre/post 2020-07-29/30 if you used flag --orbdiff_fix
+ - esds.txt - same as before, but would be corrected for the shift between datasets pre/post 2020-07-29/30 if you used flag --orbdiff_fix
 
 =====
 Usage
 =====
 daz_01_prepare_inputs.py [--infra frames.txt] [--outfra frames.csv] [--indaz esds_orig.txt] [--outdaz esds.txt] [--orbdiff_fix]
 
- --orbdiff_fix - would apply the 39 mm fix due to change in orbits in 2020-07-29/30 - TODO: use the real POD diff (already done in LiCSAR, need to add here)
+ --orbdiff_fix - would apply fix due to change in orbits in 2020-07-29/30.  If working in LiCSAR environment, it will apply real difference, otherwise will apply 39 mm constant shift.
+ (note the shift varies from this average by +-2std=25 mm and we observed also introduced bias in velocity e.g. 2 mm/year)
 """
 #%% Change log
 '''
+v1.2 2023-08-30 ML
+ - improved the orbit diff correction by using real difference between orbits
 v1.1 2022-12-07 Milan Lazecky
  - include better correction of esds.txt related to the change in orbits. here we will use the 39 mm shift to align data before and after 2020-07-29 (or 30)
 v1.0 2022-01-03 Milan Lazecky, Uni of Leeds
@@ -76,6 +79,12 @@ def main(argv=None):
                 return 0
             elif o == "--orbdiff_fix":
                 orbdiff_fix = True
+                try:
+                    from orbit_lib import *
+                    using_orbits = True
+                except:
+                    print('WARNING: LiCSAR orbit library was not loaded. Fixing orbits using only constant value of 39 mm.')
+                    using_orbits = False
             elif o == "--indaz":
                 indazfile = a
             elif o == "--infra":
@@ -104,7 +113,7 @@ def main(argv=None):
     
     if orbdiff_fix:
         print('fixing the orb diff values in '+indazfile)
-        esds = fix_pod_offset(esds)
+        esds = fix_pod_offset(esds, using_orbits=using_orbits)
     
     # some other details to prepare:
     try:
