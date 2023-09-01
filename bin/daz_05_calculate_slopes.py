@@ -113,7 +113,7 @@ def main(argv=None):
     '''
     
     # 2021-10-12: the original way:
-    for col in ['daz_mm', 'daz_mm_notide', 'daz_mm_notide_noiono_grad']:
+    for col in ['daz_mm', 'daz_mm_notide', 'daz_mm_notide_noiono_grad', 'daz_mm_notide_noiono_iri', 'daz_mm_notide_noiono']:
         if col in esds:
             print('estimating velocities of '+col)
             esds, framespd = df_calculate_slopes(esds, framespd, alpha = 1, eps = 1.35, bycol = col, subset = False, roll_assist = roll_assist)
