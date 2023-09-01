@@ -112,6 +112,8 @@ def get_tide_in_azimuth(lat, lon, hei, azi, time1):
 
 def merge_tides(esds, framespd, earthtides):
     #calculate daz_tide from N,E
+    if 'epoch' not in esds:
+        esds['epoch'] = esds.epochdate.apply(lambda x: x.strftime('%Y%m%d'))
     esds['daz_tide_mm'] = 0.0
     lenframes = len(framespd['frame'])
     # oh.. would be better using framespd.iterrows but ok..

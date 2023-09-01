@@ -740,8 +740,8 @@ def fix_oldorb_pds(framespd, esds):
 
 
 def flag_old_new_POD(esds):
-    """ This will add new column: 'new_POD' with 0/1 where 1 means 'safe to use' as it uses orbits >2020/07/30"""
-    esds['new_POD'] = 0
+    """ This will add new column (boolean): 'new_POD' where True means 'safe to use' as it uses orbits >2020/07/30"""
+    esds['new_POD'] = False
     for frame, group in esds.groupby('frame'):
         # first check if there is any epoch to fix (maybe not?)
         dazes = get_daz_frame(frame)
@@ -756,7 +756,7 @@ def flag_old_new_POD(esds):
             epochs = epochs + dazes[np.isin(dazes['rslc3'], epochs)].epoch.to_list()
             epochs = list(set(epochs))
             lenep = len(epochs)
-        group[~np.isin(group['epochdate'], epochs)]['new_POD'] = 1
+        group.loc[~np.isin(group['epochdate'], epochs), 'new_POD'] = True
         esds.update(group)
     return esds
 
