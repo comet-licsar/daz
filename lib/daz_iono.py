@@ -56,7 +56,7 @@ def extract_iono_full(esds, framespd, ionosource = 'iri'):
             continue
         selesds=esds[esds['frame']==frame].copy()
         # 2023/08: changing sign to keep consistent with the GRL article
-        selesds['daz_iono_mm'] = -1*daz_iono_grad*resolution*1000
+        selesds['daz_iono_mm'] = daz_iono_grad*resolution*1000
         selesds['tecs_A'] = tecs_A
         selesds['tecs_B'] = tecs_B
         # skipping the correction here, since daz_mm_notide might not exist/not needed:

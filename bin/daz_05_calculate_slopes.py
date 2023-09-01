@@ -56,7 +56,7 @@ def main(argv=None):
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "h", ["help", "indaz =", "infra =", "outdaz =", "outfra ="])
+            opts, args = getopt.getopt(argv[1:], "h", ["help", "indaz=", "infra=", "outdaz=", "outfra="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -114,8 +114,9 @@ def main(argv=None):
     
     # 2021-10-12: the original way:
     for col in ['daz_mm', 'daz_mm_notide', 'daz_mm_notide_noiono_grad']:
-        print('estimating velocities of '+col)
-        esds, framespd = df_calculate_slopes(esds, framespd, alpha = 1, eps = 1.35, bycol = col, subset = False, roll_assist = roll_assist)
+        if col in esds:
+            print('estimating velocities of '+col)
+            esds, framespd = df_calculate_slopes(esds, framespd, alpha = 1, eps = 1.35, bycol = col, subset = False, roll_assist = roll_assist)
     #esds, framespd = df_calculate_slopes(esds, framespd, alpha = 1, eps = 1.35, bycol = 'daz_mm_notide_noiono_F2')
     # to back up before continuing:
     print('saving datasets')
