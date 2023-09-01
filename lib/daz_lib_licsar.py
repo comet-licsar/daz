@@ -84,7 +84,7 @@ def extract2txt_esds_frame(frame):
     a = get_daz_frame(frame)
     a['epoch']=a.epoch.apply(lambda x: x.strftime('%Y%m%d'))
     a['esd_master']=a.rslc3.apply(lambda x: x.strftime('%Y%m%d'))
-    a['daz_total_wrt_orbits']=a.daz+a.cc_azi
+    a['daz_total_wrt_orbits']=a.daz  #+a.cc_azi daz is the final value (ICC+SD)
     a['orbits_precision'] = 'P'  # only Ps should be in database
     a['version'] = 'm' # i forgot what this is for, but should be ok any letter (?)
     a['frame'] = frame
