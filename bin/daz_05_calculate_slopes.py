@@ -111,12 +111,13 @@ def main(argv=None):
         ep = esds[esds.epochdate => pd.Timestamp('2020-07-30')][cols]
         esds.update(ep.subtract(-39))
     '''
-    
+    # setting 'subset' - means, only data > 2016-07-01 as before it is too noisy
+    subset = True
     # 2021-10-12: the original way:
     for col in ['daz_mm', 'daz_mm_notide', 'daz_mm_notide_noiono_grad', 'daz_mm_notide_noiono_iri', 'daz_mm_notide_noiono']:
         if col in esds:
             print('estimating velocities of '+col)
-            esds, framespd = df_calculate_slopes(esds, framespd, alpha = 1, eps = 1.35, bycol = col, subset = False, roll_assist = roll_assist)
+            esds, framespd = df_calculate_slopes(esds, framespd, alpha = 1, eps = 1.35, bycol = col, subset = subset, roll_assist = roll_assist)
     #esds, framespd = df_calculate_slopes(esds, framespd, alpha = 1, eps = 1.35, bycol = 'daz_mm_notide_noiono_F2')
     # to back up before continuing:
     print('saving datasets')
