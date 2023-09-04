@@ -82,12 +82,10 @@ def main(argv=None):
     framespd = pd.read_csv(inframesfile)
     print('decomposing frames')
     gridagg = decompose_framespd(framespd)
-    if not os.path.exists(velnc):
-        print('getting ITRF 2014 PMM for new cells')
-        gridagg = get_itrf_EN(gridagg)
-    else:
-        print('extracting values from the GNSS-based grid')
-        gridagg = get_itrf_gps_EN(gridagg, samplepoints=3, velnc=velnc, refto='NNR', rowname = 'centroid')
+    print('getting ITRF 2014 PMM for new cells')
+    if os.path.exists(velnc):
+        print('also extracting values from the available GNSS-based grid')
+    gridagg = get_itrf_gps_EN(gridagg, samplepoints=3, velnc=velnc, refto='NNR', rowname = 'centroid')
     print('exporting final decomposed data to '+outdecfile)
     gridagg.to_csv(outdecfile)
     print('done')
