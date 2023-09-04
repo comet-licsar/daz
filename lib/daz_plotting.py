@@ -43,13 +43,15 @@ def plot_vel_esd(frame_esds, frameta, level1 = 'iono_grad', level2 = None, showi
         colour = 'red'
     elif level1 == 'iono_grad':
         col_mm = 'daz_mm_notide_noiono_grad'
+        if not col_mm in frame_esds:
+            col_mm = 'daz_mm_notide_noiono'
         col_outliers = 'is_outlier_'+col_mm
-        col_label = 'daz notide, noiono (grad)'
+        col_label = 'daz notide, noiono'
         colour = 'green'
     elif level1 == 'iono_grad_OK':
         col_mm = 'daz_mm_notide_noiono_grad_OK'
         col_outliers = 'is_outlier_'+col_mm
-        col_label = 'daz notide, noiono (grad)'
+        col_label = 'daz notide, noiono'
         colour = 'green'
     elif level1 == 'iono_f2':
         col_mm = 'daz_mm_notide_noiono_F2'
@@ -101,13 +103,15 @@ def plot_vel_esd(frame_esds, frameta, level1 = 'iono_grad', level2 = None, showi
             colour = 'red'
         elif level2 == 'iono_grad':
             col_mm = 'daz_mm_notide_noiono_grad'
+            if not col_mm in frame_esds:
+                col_mm = 'daz_mm_notide_noiono'
             col_outliers = 'is_outlier_'+col_mm
-            col_label = 'daz notide, noiono (grad)'
+            col_label = 'daz notide, noiono'
             colour = 'green'
         elif level2 == 'iono_grad_OK':
             col_mm = 'daz_mm_notide_noiono_grad_OK'
             col_outliers = 'is_outlier_'+col_mm
-            col_label = 'daz notide, noiono (grad)'
+            col_label = 'daz notide, noiono'
             colour = 'green'
         elif level2 == 'iono_f2':
             col_mm = 'daz_mm_notide_noiono_F2'
@@ -174,7 +178,7 @@ def plot_vel_esd(frame_esds, frameta, level1 = 'iono_grad', level2 = None, showi
 
 
 
-def export_esds2kml(framespd, esds, kmzfile = 'esds.kmz', overwrite = False, clean = True):
+def export_esds2kml(framespd, esds, kmzfile = 'esds.kmz', level1 = 'tide', level2 = 'iono_grad', overwrite = False, clean = True):
     if os.path.exists('plots') or os.path.exists('doc.kml') or os.path.exists(kmzfile):
         if not overwrite:
             print('The kmz files already exist, please recheck')
@@ -190,7 +194,7 @@ def export_esds2kml(framespd, esds, kmzfile = 'esds.kmz', overwrite = False, cle
         selected_frame_esds = esds[esds['frame'] == frame].copy()
         #frameplot = plot_vel_esd(selected_frame_esds, frameta, showtec = False)
         try:
-            frameplot = plot_vel_esd(selected_frame_esds, frameta, level2 = 'iono_grad', level1 = 'tide', showitrf=True)
+            frameplot = plot_vel_esd(selected_frame_esds, frameta, level2 = level2, level1 = level1, showitrf=True)
             hv.save(frameplot, 'plots/{}.png'.format(frame), dpi=100, fmt='png')
         except:
             print('error generating plot for frame '+frameta['frame'])
@@ -224,7 +228,7 @@ def plot_decomposed(dec, col = 'noTI', saveit = False):
     x = dec.centroid_lon.values
     y = dec.centroid_lat.values
     cpxEN = dec.ITRF_E.values + 1j*dec.ITRF_N.values
-    cpxEN = dec['VEL_E_'+col].values - median_diff + 1j*dec.['VEL_N_'+col].values
+    cpxEN = dec['VEL_E_'+col].values - median_diff + 1j*dec['VEL_N_'+col].values
     
     direction = np.degrees(np.angle(cpxEN))
     length = np.abs(cpxEN) # in mm/year

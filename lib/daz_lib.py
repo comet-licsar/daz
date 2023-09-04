@@ -459,7 +459,10 @@ def decompose_framespd(framespd, cell_size = 2.25, crs = "EPSG:4326"):
     
     gridgrouped = merged.groupby('index_right')
     # 2. now do the decomposition
-    decomposed = gridgrouped.apply(decompose_azi2NE, 'daz_mm_notide_noiono_grad')
+    col = 'daz_mm_notide_noiono_grad'
+    if not col+'_mmyear' in framespd:
+        col = 'daz_mm_notide_noiono'
+    decomposed = gridgrouped.apply(decompose_azi2NE, col)
     gridagg['VEL_N_noTI'] = decomposed['V_N'].values
     gridagg['VEL_E_noTI'] = decomposed['V_E'].values
     gridagg['RMSE_VEL_N_noTI'] = decomposed['RMSE_N'].values
