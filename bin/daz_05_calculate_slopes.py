@@ -111,7 +111,7 @@ def main(argv=None):
         ep = esds[esds.epochdate => pd.Timestamp('2020-07-30')][cols]
         esds.update(ep.subtract(-39))
     '''
-    # setting 'subset' - means, only data > 2016-07-01 as before it is too noisy
+    # setting 'subset' - means, only data > 2016-03-01 as before it is too noisy
     subset = True
     # 2021-10-12: the original way:
     for col in ['daz_mm', 'daz_mm_notide', 'daz_mm_notide_noiono_grad', 'daz_mm_notide_noiono_iri', 'daz_mm_notide_noiono']:
