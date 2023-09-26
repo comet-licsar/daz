@@ -762,7 +762,7 @@ def flag_old_new_POD(esds):
 
 
 def get_azioffs_old_new_POD(frame, epochs = None):
-    """ Function to get correction for PODs established after 2020-07-31 in azimuth
+    """ Function to get correction for PODs established after end of July 2020 in azimuth
     """
     print('getting old/new POD difference corrections for frame '+frame)
     datelim = dt.datetime(2020,7,31).date()
@@ -774,6 +774,7 @@ def get_azioffs_old_new_POD(frame, epochs = None):
     selepochs = []
     for epoch in epochs:
         if epoch > datelim:
+            print('epoch ' + str(epoch) + ' was surely processed with POD v1.4+, skipping')
             continue
         epoch_s1ab = flag_s1b([epoch], master, master_s1ab, returnstr=True )[0]
         timesample = dt.datetime.combine(epoch, master.time())
