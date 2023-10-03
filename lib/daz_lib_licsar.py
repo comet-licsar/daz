@@ -747,7 +747,7 @@ def flag_old_new_POD(esds):
         dazes = get_daz_frame(frame)
         dazes = dazes[np.isin(dazes['epoch'], group['epochdate'])]
         epochs = []
-        epochs = epochs + dazes[dazes['orbfile']==''].epoch.to_list()
+        #epochs = epochs + dazes[dazes['orbfile']==''].epoch.to_list()
         epochs = epochs + dazes[dazes['orbfile']=='fixed_as_in_GRL'].epoch.to_list()
         aa = pd.Series(epochs)
         epochs = aa[aa < dt.datetime(2020, 7, 30).date()].to_list() # sometimes we have no info on POD used in the db..
