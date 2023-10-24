@@ -774,3 +774,34 @@ fig.savefig(os.path.join('AHBa_MAY_'+strTI+'.pdf'), dpi = 320)
 fig.show()
 
 '''
+
+def plot_daz_frame_licsar(frame, limit = 8000, newold=True):
+    import daz_lib_licsar as dl
+    dazes = dl.get_daz_frame(frame)
+    msab = dl.fc.get_frame_master_s1ab(frame)
+    mdatetime=dl.fc.get_master(frame, asdatetime=True)
+    epochdates=dazes['epoch'].tolist()
+    ABs = dl.flag_s1b(epochdates,mdatetime,msab,True)
+    dazes['AB'] = ABs
+    import numpy as np
+    if not newold:
+        toplotA = dazes[dazes['AB']=='A'].set_index('epoch').daz*14000
+        toplotB = dazes[dazes['AB']=='B'].set_index('epoch').daz*14000
+        toplotA=toplotA[np.abs(toplotA)<limit]
+        toplotB=toplotB[np.abs(toplotB)<limit]
+        toplotA.plot(title=frame, ylabel='$u_{az}$ [mm]', marker='o', linestyle='')#-.')
+        toplotB.plot(title=frame, ylabel='$u_{az}$ [mm]', marker='o', linestyle='')#-.')
+    else:
+        azioffs=dl.get_azioffs_old_new_POD(frame)
+        dazesep=dazes.set_index('epoch')
+        dazesep['pod_diff_mm']=azioffs.set_index('epochdate')['pod_diff_azi_mm']
+        dazesep['pod_diff_mm']=dazesep['pod_diff_mm'].fillna(0)
+        toplotA = dazesep[dazesep['AB']=='A'].daz*14000
+        toplotB = dazesep[dazesep['AB']=='B'].daz*14000
+        toplotA=toplotA+dazesep[dazesep['AB']=='A'].pod_diff_mm
+        toplotB=toplotB+dazesep[dazesep['AB']=='B'].pod_diff_mm
+        toplotA=toplotA[np.abs(toplotA)<limit]
+        toplotB=toplotB[np.abs(toplotB)<limit]
+        title='azioff (PODdiff-corrected): '+frame
+        toplotA.plot(title=title, ylabel='$u_{az}$ [mm]', marker='o', linestyle='')#-.')
+        toplotB.plot(title=title, ylabel='$u_{az}$ [mm]', marker='o', linestyle='')#-.')
