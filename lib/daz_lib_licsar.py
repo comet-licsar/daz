@@ -340,62 +340,75 @@ def get_avg_height_framespd(framespd):
 def get_dfDC(path_to_slcdir, f0=5405000500, burst_interval = 2.758277, returnka = True, returnperswath = False):
     #f0 = get_param_gamma('radar_frequency', parfile)
     #burst_interval = get_param_gamma('burst_interval', topsparfile)
-    parfile = glob.glob(path_to_slcdir+'/????????.slc.par')[0]
-    topsparfiles = glob.glob(path_to_slcdir+'/????????.IW?.slc.TOPS_par')
-    iwparfiles = glob.glob(path_to_slcdir+'/????????.IW?.slc.par')
+    epoch = os.path.basename(path_to_slcdir)
+    frame = path_to_slcdir.split('/')[-3]
+    parfile = os.path.join(path_to_slcdir, epoch+'.slc.par')
+    #parfile = glob.glob(path_to_slcdir+'/????????.slc.par')[0]
+    #topsparfiles = glob.glob(path_to_slcdir+'/????????.IW?.slc.TOPS_par')
+    #iwparfiles = glob.glob(path_to_slcdir+'/????????.IW?.slc.par')
     #
     lam = speed_of_light / f0
     dfDC = []
     kas = []
+    numbursts = [ int(frame.split('_')[2][:2]), int(frame.split('_')[2][2:4]), int(frame.split('_')[2][4:6])]
     #krs = []
     #print('This is a proper solution but applied to primary SLC image. originally it is applied by GAMMA on the RSLC...')
-    for n in range(len(topsparfiles)):
-        topsparfile = topsparfiles[n]
-        iwparfile = iwparfiles[n]
-        az_steering_rate = get_param_gamma('az_steering_rate', topsparfile) # az_steering_rate is the antenna beam steering rate
-        r1 = get_param_gamma('center_range_slc', iwparfile)
-        #get the satellite velocity
-        #midNstate = int(get_param_gamma('number_of_state_vectors', iwparfile)/2)+1
-        # ... actually number of burst info differs... so just using the 1st burst - as anyway we do quite drastic change to dfDC - mean from swaths
-        midNstate = 1
-        sv = 'state_vector_velocity_' + str(midNstate)
-        velc1 = get_param_gamma(sv, iwparfile, pos=0)
-        velc2 = get_param_gamma(sv, iwparfile, pos=1)
-        velc3 = get_param_gamma(sv, iwparfile, pos=2)
-        vsat = np.sqrt(velc1**2 + velc2**2 + velc3**2)
-        # now some calculations
-        afmrate_srdelay = get_param_gamma('az_fmrate_srdelay_'+ str(midNstate), topsparfile)
-        afmrate_poly = []
-        afmrate_poly.append(get_param_gamma('az_fmrate_polynomial_' + str(midNstate), topsparfile, pos = 0))
-        afmrate_poly.append(get_param_gamma('az_fmrate_polynomial_' + str(midNstate), topsparfile, pos = 1))
-        afmrate_poly.append(get_param_gamma('az_fmrate_polynomial_' + str(midNstate), topsparfile, pos = 2))
-        try:
-            afmrate_poly.append(get_param_gamma('az_fmrate_polynomial_' + str(midNstate), topsparfile, pos = 3))
-        except:
-            afmrate_poly.append(0)
-        try:
-            afmrate_poly.append(get_param_gamma('az_fmrate_polynomial_' + str(midNstate), topsparfile, pos = 4))
-        except:
-            afmrate_poly.append(0)
-        ka = s1_azfm(r1, afmrate_srdelay, afmrate_poly) #unit: Hz/s == 1/s^2
-        kr = -2.0 * vsat * az_steering_rate*(pi / 180.0) / lam
-        if (kr != 0.0):
-            #kt = ka * kr/(kr - ka)
-            # but maybe should be kt = (kr*ka)/(ka-kr) # see https://iopscience.iop.org/article/10.1088/1755-1315/57/1/012019/pdf  --- and remotesensing-12-01189-v2, and Fattahi et al...
-            # ok, gamma reads kr to be ka... corrected
-            kt = kr * ka/(ka - kr)
+    #for n in range(len(topsparfiles)):
+    for n in [1,2,3]:
+        topsparfile = os.path.join(path_to_slcdir, epoch+'IW'+str(n)+'.slc.TOPS_par')
+        iwparfile = os.path.join(path_to_slcdir, epoch+'IW'+str(n)+'.slc.par')
+        if (not os.path.exists(iwparfile)) or (not os.path.exists(topsparfile)):
+            dfDC.append(np.nan)
+            kas.append(np.nan)
+            numbursts[n-1] = np.nan
         else:
-            kt = -ka
-        #finally calculate dfDC:
-        #burst_interval = get_param_gamma('burst_interval', topsparfile)
-        kas.append(ka)
-        #krs.append(kr)
-        dfDC.append(kt*burst_interval) #burst_interval is time within the burst... we can also just calculate.. see Grandin: eq 15: hal.archives-ouvertes.fr/hal-01621519/document
-        #ok, that's the thing - burst_interval is actually t(n+1) - t(n) - see remotesensing-12-01189-v2
-        #so it should be kt * -burst_interval, that is why GAMMA has the -kt J ... ok, good to realise this
+            #topsparfile = topsparfiles[n]
+            #iwparfile = iwparfiles[n]
+            az_steering_rate = get_param_gamma('az_steering_rate', topsparfile) # az_steering_rate is the antenna beam steering rate
+            r1 = get_param_gamma('center_range_slc', iwparfile)
+            #get the satellite velocity
+            #midNstate = int(get_param_gamma('number_of_state_vectors', iwparfile)/2)+1
+            # ... actually number of burst info differs... so just using the 1st burst - as anyway we do quite drastic change to dfDC - mean from swaths
+            midNstate = 1
+            sv = 'state_vector_velocity_' + str(midNstate)
+            velc1 = get_param_gamma(sv, iwparfile, pos=0)
+            velc2 = get_param_gamma(sv, iwparfile, pos=1)
+            velc3 = get_param_gamma(sv, iwparfile, pos=2)
+            vsat = np.sqrt(velc1**2 + velc2**2 + velc3**2)
+            # now some calculations
+            afmrate_srdelay = get_param_gamma('az_fmrate_srdelay_'+ str(midNstate), topsparfile)
+            afmrate_poly = []
+            afmrate_poly.append(get_param_gamma('az_fmrate_polynomial_' + str(midNstate), topsparfile, pos = 0))
+            afmrate_poly.append(get_param_gamma('az_fmrate_polynomial_' + str(midNstate), topsparfile, pos = 1))
+            afmrate_poly.append(get_param_gamma('az_fmrate_polynomial_' + str(midNstate), topsparfile, pos = 2))
+            try:
+                afmrate_poly.append(get_param_gamma('az_fmrate_polynomial_' + str(midNstate), topsparfile, pos = 3))
+            except:
+                afmrate_poly.append(0)
+            try:
+                afmrate_poly.append(get_param_gamma('az_fmrate_polynomial_' + str(midNstate), topsparfile, pos = 4))
+            except:
+                afmrate_poly.append(0)
+            ka = s1_azfm(r1, afmrate_srdelay, afmrate_poly) #unit: Hz/s == 1/s^2
+            kr = -2.0 * vsat * az_steering_rate*(pi / 180.0) / lam
+            if (kr != 0.0):
+                #kt = ka * kr/(kr - ka)
+                # but maybe should be kt = (kr*ka)/(ka-kr) # see https://iopscience.iop.org/article/10.1088/1755-1315/57/1/012019/pdf  --- and remotesensing-12-01189-v2, and Fattahi et al...
+                # ok, gamma reads kr to be ka... corrected
+                kt = kr * ka/(ka - kr)
+            else:
+                kt = -ka
+            #finally calculate dfDC:
+            #burst_interval = get_param_gamma('burst_interval', topsparfile)
+            kas.append(ka)
+            #krs.append(kr)
+            dfDC.append(kt*burst_interval) #burst_interval is time within the burst... we can also just calculate.. see Grandin: eq 15: hal.archives-ouvertes.fr/hal-01621519/document
+            #ok, that's the thing - burst_interval is actually t(n+1) - t(n) - see remotesensing-12-01189-v2
+            #so it should be kt * -burst_interval, that is why GAMMA has the -kt J ... ok, good to realise this
     if not returnperswath:
-        dfDC = np.mean(dfDC)
-        ka = np.mean(kas)
+        numbursts = np.array(numbursts)
+        dfDC = np.sum(numbursts*np.array(dfDC)) / np.sum(numbursts)
+        ka = np.sum(numbursts*np.array(kas)) / np.sum(numbursts)
     #kr = np.mean(krs)
     if returnka:
         return dfDC, ka #, kr
