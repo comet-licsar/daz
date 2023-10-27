@@ -407,8 +407,8 @@ def get_dfDC(path_to_slcdir, f0=5405000500, burst_interval = 2.758277, returnka 
             #so it should be kt * -burst_interval, that is why GAMMA has the -kt J ... ok, good to realise this
     if not returnperswath:
         numbursts = np.array(numbursts)
-        dfDC = np.sum(numbursts*np.array(dfDC)) / np.sum(numbursts)
-        ka = np.sum(numbursts*np.array(kas)) / np.sum(numbursts)
+        dfDC = np.nansum(numbursts*np.array(dfDC)) / np.sum(numbursts)
+        ka = np.nansum(numbursts*np.array(kas)) / np.sum(numbursts)
     #kr = np.mean(krs)
     if returnka:
         return dfDC, ka #, kr
