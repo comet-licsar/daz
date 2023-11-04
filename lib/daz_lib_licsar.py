@@ -355,8 +355,8 @@ def get_dfDC(path_to_slcdir, f0=5405000500, burst_interval = 2.758277, returnka 
     #print('This is a proper solution but applied to primary SLC image. originally it is applied by GAMMA on the RSLC...')
     #for n in range(len(topsparfiles)):
     for n in [1,2,3]:
-        topsparfile = os.path.join(path_to_slcdir, epoch+'IW'+str(n)+'.slc.TOPS_par')
-        iwparfile = os.path.join(path_to_slcdir, epoch+'IW'+str(n)+'.slc.par')
+        topsparfile = os.path.join(path_to_slcdir, epoch+'.IW'+str(n)+'.slc.TOPS_par')
+        iwparfile = os.path.join(path_to_slcdir, epoch+'.IW'+str(n)+'.slc.par')
         if (not os.path.exists(iwparfile)) or (not os.path.exists(topsparfile)):
             dfDC.append(np.nan)
             kas.append(np.nan)
