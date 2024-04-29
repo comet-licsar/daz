@@ -21,13 +21,14 @@ import re
 # get daz iono
 ################### IONOSPHERE 
 
-def extract_iono_full(esds, framespd, ionosource = 'iri'):
+def extract_iono_full(esds, framespd, ionosource = 'iri', use_iri_hei=True):
     """ Full extraction of ionospheric effect from ionosource.
     Note this will create column with the phase advanced effect recalculated to apparent azimuth offset [mm] that has opposite sign.
     Therefore this conforms the GRL article and you can subtract this correction from the original values, as usual.
     
     Args:
         ionosource (str):   either 'iri' or 'code'
+        use_iri_hei (bool): estimating F2 peak altitude using IRI2016. CODE is valid for 450 km, so might be better to set this OFF for using CODE
     Returns:
         esds, framespd
     """
@@ -48,9 +49,20 @@ def extract_iono_full(esds, framespd, ionosource = 'iri'):
         try:
             #daz_iono_with_F2 = calculate_daz_iono(frame, esds, framespd)
             #daz_iono_grad, hionos, tecs_A_master, tecs_B_master = calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = True, out_tec_master = True)
-            daz_iono_grad, hionos, tecs_A_master, tecs_B_master, tecs_A, tecs_B = calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = True, out_tec_all = True, ionosource=ionosource)
-            hiono = np.mean(hionos)
-            hiono_std = np.std(hionos)
+            if use_iri_hei:
+                daz_iono_grad, hionos, tecs_A_master, tecs_B_master, tecs_A, tecs_B = calculate_daz_iono(frame, esds, framespd, method = 'gradient', out_hionos = True, out_tec_all = True, ionosource=ionosource, use_iri_hei=use_iri_hei)
+                hiono = np.mean(hionos)
+                hiono_std = np.std(hionos)
+            else:
+                daz_iono_grad, tecs_A_master, tecs_B_master, tecs_A, tecs_B = calculate_daz_iono(frame, esds,
+                                                                                                         framespd,
+                                                                                                         method='gradient',
+                                                                                                         out_hionos=False,
+                                                                                                         out_tec_all=True,
+                                                                                                         ionosource=ionosource,
+                                                                                                         use_iri_hei=use_iri_hei)
+                hiono = 450
+                hiono_std = 0
         except:
             print('some error occurred extracting TEC(s) here')
             continue
@@ -482,12 +494,28 @@ def get_abs_iono_corr(frame,esds,framespd):
     return daz_iono
 '''
 
-def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = False, out_tec_master = False, out_tec_all = False, ionosource='iri'):
-    '''
-    use method either 'gomba' - only gradient, or 'liang' that includes also some extra F2 height correction..
+def calculate_daz_iono(frame, esds, framespd, method = 'gradient', out_hionos = False, out_tec_master = False, out_tec_all = False, ionosource='iri', use_iri_hei=False):
+    ''' Function to calculate iono correction for a given frame.
+
+    Args:
+        frame (str)                 frame ID
+        esds (pandas.Dataframe)     standard esds table
+        framespd (pandas.Dataframe) standard framespd table
+        method (str)                gradient or liang (gradient is correct, Liang is kept from first attempts, may not work)
+        out_hionos (bool)           whether to output also IRI-estimated peak height of the F2 iono layer (sadly, CODE calculates for 450 km hei which is probably wrong)
+        out_tec_master (bool)
+        out_tec_all (bool)
+        ionosource (str)            iri or code (for IRI2016 or CODE GIM-based ionosphere. the latter improves RMSE!)
+        use_iri_hei (bool)          if True, it estimates F2 peak altitude using IRI2016 and uses for the correction (with any ionosource). NOTE, CODE data are for 450 km ALT! so better not use_iri_hei..
+
+    Notes: 'liang' method should include also some extra F2 height correction..
     2023/08: Liang method was first implemented here and a lot happened since that time.. Please consider it obsolete.
-    We should remove stating 'gomba' as well, since the correction is not really following his work any more (but indeed, his article was great init)
     '''
+    if method == 'gomba': # renamed it to keep as it is
+        method = 'gradient'
+    if ionosource == 'iri' and (not use_iri_hei):
+        print('using IRI2016, setting the iri to estimate F2 peak altitude')
+        use_iri_hei=True
     selected_frame_esds = esds[esds['frame'] == frame].copy()
     frameta = framespd[framespd['frame']==frame]
     # extract some variables
@@ -495,7 +523,10 @@ def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = Fal
     scene_center_lon = frameta['center_lon'].values[0]
     scene_center_lat = frameta['center_lat'].values[0]
     resolution_of_pixel = frameta['azimuth_resolution'].values[0]
-    range_avg = frameta['centre_range_m'].values[0]
+    try:
+        range_avg = frameta['centre_range_ok_m'].values[0] # 2024: GAMMA had a bug wrongly informing on centre_range (may differ by 20 km or so!). fixed most of it
+    except:
+        range_avg = frameta['centre_range_m'].values[0]
     master = frameta['master'].values[0]
     inc_angle_avg = frameta['avg_incidence_angle'].values[0]
     center_time=frameta['centre_time'].values[0]
@@ -519,10 +550,10 @@ def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = Fal
     azimuthDeg = heading-90 #yes, azimuth is w.r.t. N (positive to E)
     elevationDeg = 90-inc_angle_avg
     slantRange = range_avg
-    try:
-        scene_alt = get_altitude(scene_center_lat, scene_center_lon)
-    except:
-        scene_alt = 0
+    #try:
+    #    scene_alt = get_altitude(scene_center_lat, scene_center_lon)
+    #except:
+    #    scene_alt = 0
     #to get position of the satellite - UNCLEAR about slantRange - is this w.r.t. DEM? (should ask GAMMA) - if not (only in WGS-84), i should use scene_alt=0!
     # 2023/08: checked using orbits - the slantranfe is wrt ellipsoid! setting scene alt 0
     x, y, z = aer2ecef(azimuthDeg, elevationDeg, slantRange, scene_center_lat, scene_center_lon, 0) #scene_alt)
@@ -532,14 +563,21 @@ def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = Fal
     path = nv.GeoPath(Pscene_center.to_nvector(), Psatg.to_nvector())
     # get point in the middle
     Pmid_scene_sat = path.interpolate(0.5).to_geo_point()
-    # get hionos in that middle point:
-    tecs, hionos = get_tecs(Pmid_scene_sat.latitude_deg, Pmid_scene_sat.longitude_deg, 800, acq_times, returnhei = True)
-    hiono_master = hionos[-1]
-    selected_frame_esds['hiono'] = hionos[:-1]  ###*1000 # convert to metres, avoid last measure, as this is 'master'
     # work in dedicated table
     df = pd.DataFrame(acq_times)
-    df['hiono'] = hionos
-    #
+    # 2024: not clear if IRI2016 F2 peak altitude is correct. Allowing the standard 450 km assumption by CODE (I think TECs will get scaled, so the gradient should be still ok. Not tested)
+    if use_iri_hei or out_hionos:
+        # get hionos in that middle point:
+        tecs, hionos = get_tecs(Pmid_scene_sat.latitude_deg, Pmid_scene_sat.longitude_deg, 800, acq_times, returnhei = True)
+        hiono_master = hionos[-1]
+        selected_frame_esds['hiono'] = hionos[:-1]  ###*1000 # convert to metres, avoid last measure, as this is 'master'
+        df['hiono'] = hionos
+    else:
+        df['hiono'] = 450 # standard altitude used by CODE
+        hionos = list(df.hionos.values)
+        hiono_master = 450
+        selected_frame_esds['hiono'] = 450
+        #
     ############## now calculate TEC using the SLM knowledge, i.e. different A,B per epoch (!)
     # (note that the last hiono is for the master/reference epoch
     tecs_A = []
@@ -597,12 +635,13 @@ def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = Fal
     fL = f0 - dfDC*0.5
     #tecovl = (TECs_B1 - TEC_master_B1)/(fH*fH) - (TECs_B2 - TEC_master_B2)/(fL*fL)
     #daz_iono = -2*PRF*k*f0/c/dfDC * tecovl
-    if method == 'gomba':
+    if method == 'gradient':
         # 08/2021 - empirically checked, correct:
         #tecovl = (selected_frame_esds['TECS_B'] - tec_B_master)/(fL*fL) - (selected_frame_esds['TECS_A'] - tec_A_master)/(fH*fH)
         #daz_iono = 2*PRF*k*f0/c/dfDC * tecovl
         # 04/2022 - actually the squares seem not needed, based directly on iono2phase (see article):
         # note it is 'master' minus 'epoch S', since i start from ifg as M * complex conjugate of S (so basically phase M - phase S, phase is negative for higher delay)
+        # 2023 - oh well, it was best to do straightforward equations, see Lazecky et al., 2023, GRL
         tecovl = (tec_A_master - selected_frame_esds['TECS_A'])/fH - (tec_B_master - selected_frame_esds['TECS_B'])/fL
         daz_iono = 2*PRF*k/c/dfDC * tecovl
     else:
@@ -643,7 +682,10 @@ def calculate_daz_iono(frame, esds, framespd, method = 'gomba', out_hionos = Fal
         else:
             return daz_iono, hionos
     else:
-        return daz_iono
+        if out_tec_all:
+            return daz_iono, tec_A_master, tec_B_master, tecs_A, tecs_B
+        else:
+            return daz_iono
 
 
 
