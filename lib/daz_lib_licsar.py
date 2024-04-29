@@ -251,6 +251,8 @@ def generate_framespd(fname = 'esds2021_frames.txt', outcsv = 'framespd_2021.csv
     a['dfDC'] = 0.00
     a['avg_height'] = 0.00
     for i,row in a.iterrows():
+        if np.mod(i, 100)==0:
+            print('Processed '+str(i)+'/'+str(len(a))+' frames', flush=True)
         frame=row['frame']
         #print(frame)
         tr = int(frame[:3])
