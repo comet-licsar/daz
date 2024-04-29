@@ -272,7 +272,10 @@ def generate_framespd(fname = 'esds2021_frames.txt', outcsv = 'framespd_2021.csv
             heading = float(grep1line('heading',metafile).split('=')[1])
             azimuth_resolution = float(grep1line('azimuth_resolution',metafile).split('=')[1])
             avg_incidence_angle = float(grep1line('avg_incidence_angle',metafile).split('=')[1])
-            centre_range_m = float(grep1line('centre_range_m',metafile).split('=')[1])
+            try:
+                centre_range_m = float(grep1line('centre_range_ok_m',metafile).split('=')[1])
+            except:
+                centre_range_m = float(grep1line('centre_range_m',metafile).split('=')[1])
             centre_time = grep1line('center_time',metafile).split('=')[1]
         except:
             print('some error occurred during frame '+frame)
