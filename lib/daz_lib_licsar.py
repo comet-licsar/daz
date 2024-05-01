@@ -246,9 +246,8 @@ def generate_framespd(fname = 'esds2021_frames.txt', outcsv = 'framespd_2021.csv
     Note: input fname is generated using create_framelist and has header:
     frame, master, center_lon, center_lat
 
-    Output:
-    csv with header:
-    frame, master, center_lon, center_lat, heading, azimuth_resolution
+    Output - csv with header:
+    frame, master, center_lon, center_lat, heading, azimuth_resolution, avg_incidence_angle, centre_range_m, centre_time, ka, dfDC, avg_height, S1AorB
     '''
     ### fname is input file containing list of frames to generate the frames csv table
     #in the form of:

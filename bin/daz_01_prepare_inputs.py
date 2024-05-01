@@ -110,8 +110,10 @@ def main(argv=None):
     framespd = generate_framespd(inframesfile, outframesfile)
     
     # working with esds file
+    print('Done. Now loading the esds and framespd tables ')
     esds, framespd = load_csvs(esdscsv = indazfile, framescsv = outframesfile)
-    
+    print('loaded '+str(len(esds))+' SD records')
+
     if orbdiff_fix:
         print('fixing the orb diff values in '+indazfile)
         esds = fix_pod_offset(esds, using_orbits=using_orbits)

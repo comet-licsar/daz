@@ -535,7 +535,7 @@ def get_s1b_offset(epd, fpd, col = 'daz_mm_notide_noiono', fix_pod_offset = True
     years = epd.years_since_beginning.values
     dazes = dazes.values
     masterdate = pd.Timestamp(fpd.master.values[0])
-    mastersat = fpd.s1AorB.values[0]
+    mastersat = fpd['S1AorB'].values[0]
     isB = flag_s1b(epochdates, masterdate, mastersat)
     if not split_by_pod:
         if fit_offset:
@@ -617,7 +617,7 @@ def flag_s1b_esds(esds, framespd):
             print('Warning, frame {} not found in framespd, skipping') #'using defaults'.format(frame))
             continue
         else:
-            mastersat = frameta.s1AorB.values[0]
+            mastersat = frameta['S1AorB'].values[0]
             if mastersat == 'X':
                 print('assuming S1A for master of frame '+frame)
                 mastersat = 'A'
