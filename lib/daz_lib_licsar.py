@@ -241,6 +241,15 @@ def extract_frame_master_s1abs(framespd):
 
 
 def generate_framespd(fname = 'esds2021_frames.txt', outcsv = 'framespd_2021.csv'):
+    ''' Function to collect additional data for frames listed in fname txt file, and store as a csv.
+
+    Note: input fname is generated using create_framelist and has header:
+    frame, master, center_lon, center_lat
+
+    Output:
+    csv with header:
+    frame, master, center_lon, center_lat, heading, azimuth_resolution
+    '''
     ### fname is input file containing list of frames to generate the frames csv table
     #in the form of:
     # frame,master,center_lon,center_lat
@@ -318,10 +327,35 @@ def generate_framespd(fname = 'esds2021_frames.txt', outcsv = 'framespd_2021.csv
         a.at[i,'ka']  = ka
         a.at[i,'avg_height'] = hei
         #a.at[i,'kr']  = kr
+    print('Information on frames collected. Flagging satellite ID (S1A/B) of the reference epoch')
     a = extract_frame_master_s1abs(a)
+    print('cleaning the dataset')
+    preclean = len(a)
+    try:
+        a = clean_framespd(a)
+    except:
+        print('some error during cleaning, keeping the original table')
+    postclean = len(a)
+    print('{0}/{1} frames remain after the cleaning'.format(str(postclean), str(preclean))
     a.to_csv(outcsv, float_format='%.4f', index=False)
     return a
 
+
+def clean_framespd(a):
+    a=a[a['S1AorB']!='X']
+    a=a[a['master']!='False']
+    a = a[a['heading'] != 0]
+    a = a[a['azimuth_resolution'] != 0]
+    a = a[a['avg_incidence_angle'] != 0]
+    a = a[a['centre_range_m'] != 0]
+    a = a[a['centre_time'] != 0]
+    a = a[a['ka'] != 0]
+    a = a[a['dfDC'] != 0]
+    a = a[a['frame'].str[5]!='S']
+    for fie in a:
+        a = a[~np.isnan(a[fie])]
+    a = a.reset_index(drop=True)
+    return a
 
 
 def get_avg_height(frame):

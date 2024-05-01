@@ -632,7 +632,7 @@ def fix_pod_offset(esds, using_orbits = False):
     """Function to fix the shift after new orbits in 2020-07-29/30, either using real POD diff if possible (if in LiCSAR), or applying 39 mm constant value.
     Args:
         esds (pd.Dataframe):   as loaded (i.e. with the relevant daz columns)
-        using_orbits (bool):    if True, it will try use directly PODs to find diff (only with daz_lib_licsar)
+        using_orbits (bool):   if True, it will try use directly PODs to find diff (only with daz_lib_licsar)
     Returns:
         pd.DataFrame :  original esds with applied correction
     """
