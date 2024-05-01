@@ -336,7 +336,7 @@ def generate_framespd(fname = 'esds2021_frames.txt', outcsv = 'framespd_2021.csv
     except:
         print('some error during cleaning, keeping the original table')
     postclean = len(a)
-    print('{0}/{1} frames remain after the cleaning'.format(str(postclean), str(preclean))
+    print('{0}/{1} frames remain after the cleaning'.format(str(postclean), str(preclean)))
     a.to_csv(outcsv, float_format='%.4f', index=False)
     return a
 
