@@ -107,7 +107,7 @@ def main(argv=None):
     
     # processing itself:
     print('Generating output frames csv file - ETA couple of hours as we derive lot of info from frame txt files etc.')
-    generate_framespd(inframesfile, outframesfile)
+    framespd = generate_framespd(inframesfile, outframesfile)
     
     # working with esds file
     esds, framespd = load_csvs(esdscsv = indazfile, framescsv = outframesfile)
