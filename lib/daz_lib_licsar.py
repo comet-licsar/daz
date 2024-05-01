@@ -260,7 +260,11 @@ def generate_framespd(fname = 'esds2021_frames.txt', outcsv = 'framespd_2021.csv
         if not os.path.exists(metafile):
             print('metadata file does not exist for frame '+frame)
             continue
-        primepoch = grep1line('master=',metafile).split('=')[1]
+        try:
+            primepoch = grep1line('master=',metafile).split('=')[1]
+        except:
+            print('the frame '+frame+' has no information on primary epoch in metadata.txt. Skipping')
+            continue
         path_to_slcdir = os.path.join(os.environ['LiCSAR_procdir'], str(tr), frame, 'SLC', primepoch)
         # 
         #if frame == '174A_05407_121212':
