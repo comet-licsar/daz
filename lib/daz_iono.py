@@ -142,24 +142,24 @@ def get_tecs(glat, glon, altitude, acq_times, returnhei = False, source='iri', a
 
 def download_code_data(acqtime, storedir = '/gws/nopw/j04/nceo_geohazards_vol1/code_iono'):
     instrings = ['CODG', 'CGIM']
-    lastrings = ['I', 'N']
+    #lastrings = ['I', 'N']
     ffound = False
     for instr in instrings:
-        for lastr in lastrings:
-            if not ffound:
-                filename = instr + acqtime.strftime('%j') + '0.' + acqtime.strftime('%y') + lastr+'.Z'
-                url = 'http://ftp.aiub.unibe.ch/CODE/' + acqtime.strftime('%Y') + '/' + filename
-                fullpath = os.path.join(storedir, filename)
-                ionix = fullpath[:-2]
-                if not os.path.exists(ionix):
-                    if not os.path.exists(fullpath):
-                        # download this
-                        try:
-                            wget.download(url, out=storedir)
-                        except:
-                            ffound = False
-                if os.path.exists(fullpath):
-                    ffound = True
+        #for lastr in lastrings:
+        if not ffound:
+            filename = instr + acqtime.strftime('%j') + '0.' + acqtime.strftime('%y') + 'I.Z'
+            url = 'http://ftp.aiub.unibe.ch/CODE/' + acqtime.strftime('%Y') + '/' + filename
+            fullpath = os.path.join(storedir, filename)
+            ionix = fullpath[:-2]
+            if not os.path.exists(ionix):
+                if not os.path.exists(fullpath):
+                    # download this
+                    try:
+                        wget.download(url, out=storedir)
+                    except:
+                        ffound = False
+            if os.path.exists(fullpath):
+                ffound = True
     if not ffound:
         print('no CODE layer found for this date')
         return False
