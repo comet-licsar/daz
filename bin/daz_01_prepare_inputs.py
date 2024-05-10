@@ -119,10 +119,15 @@ def main(argv=None):
         esds = fix_pod_offset(esds, using_orbits=using_orbits)
     
     # some other details to prepare:
+    print('flagging S1A/B per temporal sample')
     try:
         esds = flag_s1b_esds(esds, framespd)
+        esds = esds[esds['S1AorB'] != 'X']
     except:
         print('unable to flag S1A/B for now, skipping')
+
+    print('final esds dataset has ' + str(len(esds)) + ' SD records')
+    print('exporting esds dataset to '+outdazfile)
     esds.to_csv(outdazfile, index=False)
     #else:
     #    # just reload it and save - at least will check for consistency

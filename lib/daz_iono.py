@@ -15,7 +15,13 @@ import iri2016
 import pyproj
 import numpy as np
 import re
-
+import glob
+try:
+    import wget
+    #import zlib
+    from LiCSAR_misc import grep1line
+except:
+    print('error loading libraries to use of CODE (either wget or LiCSAR_misc). Use of CODE will fail')
 
 
 # get daz iono
@@ -132,12 +138,35 @@ def get_tecs(glat, glon, altitude, acq_times, returnhei = False, source='iri', a
     else:
         return TECs
 
-try:
-    import wget
-    #import zlib
-    from LiCSAR_misc import grep1line
-except:
-    print('error loading libraries to use of CODE (either wget or LiCSAR_misc). Use of CODE will fail')
+
+
+def download_code_data(acqtime, storedir = '/gws/nopw/j04/nceo_geohazards_vol1/code_iono'):
+    instrings = ['CODG', 'CGIM']
+    ffound = False
+    for instr in instrings:
+        if not ffound:
+            filename = instr + acqtime.strftime('%j') + '0.' + acqtime.strftime('%y') + 'I.Z'
+            url = 'http://ftp.aiub.unibe.ch/CODE/' + acqtime.strftime('%Y') + '/' + filename
+            fullpath = os.path.join(storedir, filename)
+            ionix = fullpath[:-2]
+            if not os.path.exists(ionix):
+                if not os.path.exists(fullpath):
+                    # download this
+                    try:
+                        wget.download(url, out=storedir)
+                    except:
+                        ffound = False
+            if os.path.exists(fullpath):
+                ffound = True
+    if not ffound:
+        print('no CODE layer found for this date')
+        return False
+    if not os.path.exists(ionix):
+        rc = os.system('cd ' + storedir + '; 7za x ' + filename + ' >/dev/null 2>/dev/null; rm ' + fullpath)
+    if not os.path.exists(ionix):
+        print('ERROR: maybe you do not have 7za installed')
+        return False
+    return ionix
 
 
 def get_vtec_from_code(acqtime, lat = 0, lon = 0, storedir = '/gws/nopw/j04/nceo_geohazards_vol1/code_iono', return_fullxr = False):
@@ -152,21 +181,14 @@ def get_vtec_from_code(acqtime, lat = 0, lon = 0, storedir = '/gws/nopw/j04/nceo
     """
     #D = acqtime.strftime('%Y%m%d')
     #ipp = np.array([lat,lon])
-    filename = 'CODG' + acqtime.strftime('%j') + '0.' + acqtime.strftime('%y')+ 'I.Z'
-    url = 'http://ftp.aiub.unibe.ch/CODE/' + acqtime.strftime('%Y') + '/' + filename
-    fullpath = os.path.join(storedir,filename)
-    ionix = fullpath[:-2]
-    if not os.path.exists(ionix):
-        if not os.path.exists(fullpath):
-            # download this
-            wget.download(url, out=storedir)
-    #try:
-        #    object1 = open(fullpath, 'rb').read()
-        #    ionix = zlib.decompress(object1)  # does not work!!!
-    if not os.path.exists(ionix):
-        rc = os.system('cd '+storedir+'; 7za x '+filename+' >/dev/null 2>/dev/null; rm '+fullpath)
-    if not os.path.exists(ionix):
-        print('ERROR: maybe you do not have 7za installed')
+    # check if exists:
+    fna = glob.glob(storedir+'/????'+ acqtime.strftime('%j') + '0.' + acqtime.strftime('%y')+ 'I')
+    if fna:
+        ionix = os.path.join(storedir,fna[0])
+    else:
+        # download:
+        ionix = download_code_data(acqtime, storedir)
+    if not ionix:
         return False
     #else:
     #    rc=os.system('rm '+fullpath) # clean the .Z
