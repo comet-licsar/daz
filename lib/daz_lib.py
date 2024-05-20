@@ -35,10 +35,6 @@ def load_csvs(esdscsv = 'esds.csv', framescsv = 'frames.csv', core_init = False)
     if 'epoch' in esds.columns:
         esds = esds.drop('epoch', axis=1)
     esds['epochdate'] = esds.apply(lambda x : pd.to_datetime(str(x.epochdate)).date(), axis=1)
-    try:
-        esds['esd_master'] = esds['esd_master'].astype('int')
-    except:
-        print('no esd_master column?')
     if core_init:
         mindate = esds['epochdate'].min()
         #maxdate = esds['epochdate'].max()
@@ -163,14 +159,14 @@ def df_preprepare_esds(esdsin, framespdin, firstdate = '', countlimit = 25):
         if frameta.empty:
             #print('Warning, frame {} not found in framespd, using defaults'.format(frame))
             #azimuth_resolution = 14.0
-            print('Warning, frame {0} not found in framespd, skipping'.format(frame))
+            print('Warning, frame {} not found in framespd, skipping'.format(frame))
             esds = esds.drop(esds.loc[esds['frame']==frame].index)
             continue
         else:
             azimuth_resolution = float(frameta['azimuth_resolution'])
         count = group.epochdate.count()
         if count < countlimit:
-            print('small number of {0} samples in frame '.format(str(count))+frame+' - removing')
+            print('small number of {} samples in frame '.format(str(count))+frame+' - removing')
             #esds = esds[esds['frame'] != frame]
             esds = esds.drop(esds.loc[esds['frame']==frame].index)
             framespd = framespd.drop(framespd.loc[framespd['frame']==frame].index)
@@ -671,9 +667,12 @@ def fix_pod_offset(esds, using_orbits = False):
                 if not fepazis.empty:
                     # merge to group and then update esds
                     groupd = group.copy(deep=True)
+                    # 2024/05: found the BUG - index gets lost after 'on' merging. overcoming by origindex:
+                    groupd['origindex'] = groupd.index.values
                     groupd = groupd.merge(fepazis, how='inner', on='epochdate')
                     groupd['pod_diff_azi_m']=groupd['pod_diff_azi_m']+groupd['pod_diff_azi_mm']/1000
                     groupd=groupd.drop(columns=['pod_diff_azi_mm'])
+                    groupd=groupd.set_index('origindex')
                     esds.update(groupd)
             except:
                 print('some error with frame '+frame+'. Setting only -39 mm correction.')
