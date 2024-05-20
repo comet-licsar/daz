@@ -37,6 +37,9 @@ from daz_iono import *
 
 import getopt, os, sys
 
+# keeping assumption of hei=450 km --- best to test first (yet at the moment we are anyway quite coarse due to 1-value-per-frame)
+use_iri_hei = False
+
 class Usage(Exception):
     """Usage context manager"""
     def __init__(self, msg):
@@ -101,7 +104,7 @@ def main(argv=None):
     print('extra data cleaning step - perhaps should add to another step (first?)')
     esds, framespd = df_preprepare_esds(esds, framespd, firstdate = '', countlimit = 25)
     print('performing the iono calculation')
-    esds, framespd = extract_iono_full(esds, framespd, ionosource = ionosource)
+    esds, framespd = extract_iono_full(esds, framespd, ionosource = ionosource, use_iri_hei=use_iri_hei)
     if 'daz_mm_notide' in esds:
         col = 'daz_mm_notide'
     else:
