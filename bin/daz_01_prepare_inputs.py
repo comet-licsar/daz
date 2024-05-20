@@ -80,7 +80,7 @@ def main(argv=None):
             elif o == "--orbdiff_fix":
                 orbdiff_fix = True
                 try:
-                    from orbit_lib import *
+                    from orbit_lib import get_azi_diff_from_two_orbits
                     using_orbits = True
                 except:
                     print('WARNING: LiCSAR orbit library was not loaded. Fixing orbits using only constant value of 39 mm.')
