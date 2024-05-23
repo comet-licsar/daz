@@ -652,7 +652,14 @@ def fix_pod_offset(esds, using_orbits = False):
         esds['pod_diff_azi_m'] = esds[col]*0
         for frame, group in esds.groupby('frame'):
             # first check if there is any epoch to fix (maybe not?)
-            dazes = get_daz_frame(frame)
+            try:
+                dazes = get_daz_frame(frame)
+            except:
+                print('Error getting info on frame '+frame+'. Setting only -39 mm correction.')
+                ep = group[group.epochdate <= dt.datetime(2020,7,30).date() ]['pod_diff_azi_m']
+                offset_m = 0.039
+                esds.update(ep.subtract(offset_m))
+                continue
             epochs = []
             epochs = epochs + dazes[dazes['orbfile']==''].epoch.to_list()
             epochs = epochs + dazes[dazes['orbfile']=='fixed_as_in_GRL'].epoch.to_list()
