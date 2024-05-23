@@ -29,7 +29,14 @@ if [ ! -f $in_esds ] || [ ! -f $in_frames ] || [ -f $out_SET ]; then
   exit
 fi
 
-echo "frame, epoch, dEtide, dNtide, dUtide" > $out_SET
+j='none'
+i=0; for x in `head -n1 $in_esds | sed 's/\,/ /g'`; do let i=$i+1; if [ `echo $x | cut -c -5` == 'epoch' ]; then j=$i; fi; done
+if [ $j == 'none' ]; then
+ echo "ERROR, input file does not contain epoch or epochdate column"
+ exit
+fi
+
+echo "frame,epoch,dEtide,dNtide,dUtide" > $out_SET
 for aline in `cat $in_frames | tail -n+2 `; do
   frame=`echo $aline | cut -d ',' -f1`
   if [ `grep -c $frame $in_esds` -gt 0 ]; then
@@ -49,12 +56,16 @@ for aline in `cat $in_frames | tail -n+2 `; do
      NM=$(printf "%.12f" "$NM")
      EM=$(printf "%.12f" "$EM")
      VM=$(printf "%.12f" "$VM")
-     
-     
+
+
      for eline in `grep ^$frame $in_esds`; do
       #epochdate=`echo $eline | cut -d ',' -f2`
-      epochdate=`echo $eline | cut -d ',' -f3`
-      epochdatee=`echo ${epochdate:0:4}-${epochdate:4:2}-${epochdate:6:2}`
+      epochdate=`echo $eline | cut -d ',' -f$j`
+      if [ `echo $epochdate | grep -c '-'` == 0 ]; then
+        epochdatee=`echo ${epochdate:0:4}-${epochdate:4:2}-${epochdate:6:2}`
+      else
+        epochdatee=$epochdate
+      fi
       epochdt=$epochdatee"T"$centertime
       etide=`gmt earthtide -L$lon/$lat -T$epochdt 2>/dev/null | sed 's/\t/,/g'`
       NE=`echo $etide | cut -d ',' -f2`

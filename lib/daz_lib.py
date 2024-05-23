@@ -65,6 +65,14 @@ def EN2azi(N, E, heading = -169):
     #thanks Chris Rollins!!!!
     return E*np.sin(alpha)+N*np.cos(alpha)
 
+def heading2EN_lookvector(heading): # e.g. heading = -169
+    print('TODO')
+    E=0
+    N=0
+    return E, N # sensitivities in both directions to the defo caught along track
+    #ascending: around -13
+    #descending: around -169
+    #alpha = np.deg2rad(heading)
 
 
 
@@ -124,12 +132,12 @@ def merge_tides(esds, framespd, earthtides):
             frameta = framespd[framespd['frame'] == frame]
             tiderows_frame = earthtides[earthtides['frame'] == frame]
             for i,row in esds[esds['frame'] == frame].iterrows():
-                tiderow = tiderows_frame[tiderows_frame[' epoch'] == row['epoch']]
+                tiderow = tiderows_frame[tiderows_frame['epoch'] == row['epoch']]
                 if tiderow.empty:
                     print('error in frame '+frame+'- no epoch in tides')
                     continue
-                E = tiderow[' dEtide'].values[0]
-                N = tiderow[' dNtide'].values[0]
+                E = tiderow['dEtide'].values[0]
+                N = tiderow['dNtide'].values[0]
                 heading = frameta['heading']
                 daz_tide_mm = EN2azi(N, E, heading)*1000
                 esds.at[i,'daz_tide_mm'] = daz_tide_mm

@@ -82,6 +82,7 @@ def main(argv=None):
                 try:
                     from orbit_lib import get_azi_diff_from_two_orbits
                     using_orbits = True
+                    print('Will use real POD difference to fix 2020/07/31 jump. This may take long time!')
                 except:
                     print('WARNING: LiCSAR orbit library was not loaded. Fixing orbits using only constant value of 39 mm.')
                     using_orbits = False
