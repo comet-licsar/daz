@@ -107,7 +107,7 @@ def main(argv=None):
     earthtides = pd.read_csv(tidescsv)
     #esds = pd.read_csv(indazfile)
     #framespd = pd.read_csv(inframesfile)
-    esds, framespd = load_csvs(esdscsv=indazfile, framescsv=outframesfile)
+    esds, framespd = load_csvs(esdscsv=indazfile, framescsv=inframesfile)
     print('converting SET data to azimuth direction and merging with ESD values')
     esds = merge_tides(esds, framespd, earthtides)
     print('exporting final merge to '+outdazfile)
