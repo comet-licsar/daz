@@ -65,14 +65,11 @@ def EN2azi(N, E, heading = -169):
     #thanks Chris Rollins!!!!
     return E*np.sin(alpha)+N*np.cos(alpha)
 
+
 def heading2EN_lookvector(heading): # e.g. heading = -169
-    print('TODO')
-    E=0
-    N=0
+    # sensitivities to E, N. i.e. d_{azi} = E*sin(heading)+N*cos(heading)
+    E, N = np.sin(np.radians(heading)), np.cos(np.radians(heading))
     return E, N # sensitivities in both directions to the defo caught along track
-    #ascending: around -13
-    #descending: around -169
-    #alpha = np.deg2rad(heading)
 
 
 

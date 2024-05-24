@@ -3,7 +3,9 @@
 # 2021-06-24
 # M Lazecky 2020, 2021
 # this is to get earth tides (bash):
-# NOTE: takes long (last full processing took 2 days)
+# NOTE: takes long..
+#
+# output csv has epochdate column as YYYYMMDD
 
 if [ -z $3 ]; then
  echo "Usage: in_esds in_frames out_SET"
@@ -65,6 +67,7 @@ for aline in `cat $in_frames | tail -n+2 `; do
         epochdatee=`echo ${epochdate:0:4}-${epochdate:4:2}-${epochdate:6:2}`
       else
         epochdatee=$epochdate
+        epochdate=`echo $epochdate | sed 's/-//g'`
       fi
       epochdt=$epochdatee"T"$centertime
       etide=`gmt earthtide -L$lon/$lat -T$epochdt 2>/dev/null | sed 's/\t/,/g'`
