@@ -163,7 +163,7 @@ def download_code_data(acqtime, storedir = '/gws/nopw/j04/nceo_geohazards_vol1/c
             else:
                 ffound = True
     # since 12/2022 they changed naming convention to e.g. COD0OPSFIN_20230510000_01D_01H_GIM.INX.gz
-    # TODO! BUT eg 20230510 contains data for 20230210 - yeah, because this is not date!!!
+    # see https://cddis.nasa.gov/Data_and_Derived_Products/GNSS/atmospheric_products.html#iono
     if not ffound:
         filename = 'COD0OPSFIN_'+ acqtime.strftime('%Y') + acqtime.strftime('%j')+'0000_01D_01H_GIM.INX.gz' # TODO: check YMD
         #filename = instr + acqtime.strftime('%j') + '0.' + acqtime.strftime('%y') + 'I.Z'
