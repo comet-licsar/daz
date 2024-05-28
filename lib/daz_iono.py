@@ -598,7 +598,7 @@ def calculate_daz_iono(frame, esds, framespd, method = 'gradient', out_hionos = 
         df['hiono'] = hionos
     else:
         df['hiono'] = 450 # standard altitude used by CODE
-        hionos = list(df.hionos.values)
+        hionos = list(df.hiono.values)
         hiono_master = 450
         selected_frame_esds['hiono'] = 450
         #
