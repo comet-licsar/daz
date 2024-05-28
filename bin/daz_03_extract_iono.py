@@ -72,7 +72,7 @@ def main(argv=None):
                 return 0
             if o == '--use_code':
                 ionosource = 'code'
-                print('using CODE for iono correction - note only data older than 6 months will have the CODE data available (rest=0)')
+                print('using CODE for iono correction - note latest data might not be processed (will be stored as NaN in the csv)')
             elif o == "--indaz":
                 indazfile = a
             elif o == "--infra":
