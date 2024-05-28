@@ -80,9 +80,10 @@ def extract_iono_full(esds, framespd, ionosource = 'iri', use_iri_hei=True):
         # skipping the correction here, since daz_mm_notide might not exist/not needed:
         #selesds['daz_mm_notide_noiono_grad'] = selesds['daz_mm_notide'] + selesds['daz_iono_grad_mm'] #*resolution*1000
         esds.update(selesds)
-        framespd.at[framespd[framespd['frame']==frame].index[0], 'Hiono'] = hiono
-        framespd.at[framespd[framespd['frame']==frame].index[0], 'Hiono_std'] = hiono_std
-        framespd.at[framespd[framespd['frame']==frame].index[0], 'Hiono_range'] = max(hionos)-min(hionos)
+        framespd.at[framespd[framespd['frame'] == frame].index[0], 'Hiono'] = hiono
+        if use_iri_hei:
+            framespd.at[framespd[framespd['frame']==frame].index[0], 'Hiono_std'] = hiono_std
+            framespd.at[framespd[framespd['frame']==frame].index[0], 'Hiono_range'] = max(hionos)-min(hionos)
         framespd.at[framespd[framespd['frame']==frame].index[0], 'tecs_A'] = tecs_A_master
         framespd.at[framespd[framespd['frame']==frame].index[0], 'tecs_B'] = tecs_B_master
         #esds.at[esds[esds['frame']==frame].index, 'daz_mm_notide_noiono_F2'] = esds[esds['frame']==frame]['daz_mm_notide'] - esds['daz_iono_with_F2']*resolution*1000
