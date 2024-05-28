@@ -158,7 +158,9 @@ def download_code_data(acqtime, storedir = '/gws/nopw/j04/nceo_geohazards_vol1/c
                         wget.download(url, out=storedir)
                     except:
                         ffound = False
-            if os.path.exists(fullpath):
+                if os.path.exists(fullpath):
+                    ffound = True
+            else:
                 ffound = True
     # since 12/2022 they changed naming convention to e.g. COD0OPSFIN_20230510000_01D_01H_GIM.INX.gz
     # TODO! BUT eg 20230510 contains data for 20230210 - yeah, because this is not date!!!
@@ -176,7 +178,9 @@ def download_code_data(acqtime, storedir = '/gws/nopw/j04/nceo_geohazards_vol1/c
                 except:
                     print('error during wget download')
                     ffound = False
-        if os.path.exists(fullpath):
+            if os.path.exists(fullpath):
+                ffound = True
+        else:
             ffound = True
     if not ffound:
         print('no CODE layer found for '+filename)
