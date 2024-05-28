@@ -160,6 +160,23 @@ def download_code_data(acqtime, storedir = '/gws/nopw/j04/nceo_geohazards_vol1/c
                         ffound = False
             if os.path.exists(fullpath):
                 ffound = True
+    # since 12/2022 they changed naming convention to e.g. COD0OPSFIN_20230510000_01D_01H_GIM.INX.gz
+    # TODO! BUT eg 20230510 contains data for 20230210 - yeah, because this is not date!!!
+    if not ffound:
+        filename = 'COD0OPSFIN_'+ acqtime.strftime('%Y') + acqtime.strftime('%j')+'0000_01D_01H_GIM.INX.gz' # TODO: check YMD
+        #filename = instr + acqtime.strftime('%j') + '0.' + acqtime.strftime('%y') + 'I.Z'
+        url = 'http://ftp.aiub.unibe.ch/CODE/' + acqtime.strftime('%Y') + '/' + filename
+        fullpath = os.path.join(storedir, filename)
+        ionix = fullpath[:-2]
+        if not os.path.exists(ionix):
+            if not os.path.exists(fullpath):
+                # download this
+                try:
+                    wget.download(url, out=storedir)
+                except:
+                    ffound = False
+        if os.path.exists(fullpath):
+            ffound = True
     if not ffound:
         print('no CODE layer found for this date')
         return False
