@@ -127,8 +127,8 @@ def get_tecs(glat, glon, altitude, acq_times, returnhei = False, source='iri', a
                 tec = get_vtec_from_code(acqtime, glat, glon)
             except:
                 # CODE data is not available earlier than with 6 months delay.. or more?
-                tec = 0
-                print('No CODE data for date '+str(acqtime.date())+'. Setting zero.')
+                tec = np.nan
+                print('No CODE data for date '+str(acqtime.date())+'. Setting NaN.')
             # decrease the value by some alpha... we expect alpha % of TEC being below the satellite.. should be improved
             #alpha = 0.85
             tec = alpha*tec
