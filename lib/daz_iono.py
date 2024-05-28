@@ -167,7 +167,7 @@ def download_code_data(acqtime, storedir = '/gws/nopw/j04/nceo_geohazards_vol1/c
         #filename = instr + acqtime.strftime('%j') + '0.' + acqtime.strftime('%y') + 'I.Z'
         url = 'http://ftp.aiub.unibe.ch/CODE/' + acqtime.strftime('%Y') + '/' + filename
         fullpath = os.path.join(storedir, filename)
-        ionix = fullpath[:-2]
+        ionix = fullpath[:-3]
         if not os.path.exists(ionix):
             if not os.path.exists(fullpath):
                 # download this
