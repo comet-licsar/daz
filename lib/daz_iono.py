@@ -172,13 +172,14 @@ def download_code_data(acqtime, storedir = '/gws/nopw/j04/nceo_geohazards_vol1/c
             if not os.path.exists(fullpath):
                 # download this
                 try:
-                    wget.download(url, out=storedir)
+                    wgotfile = wget.download(url, out=storedir)
                 except:
+                    print('error during wget download')
                     ffound = False
         if os.path.exists(fullpath):
             ffound = True
     if not ffound:
-        print('no CODE layer found for this date')
+        print('no CODE layer found for '+filename)
         return False
     if not os.path.exists(ionix):
         rc = os.system('cd ' + storedir + '; 7za x ' + filename + ' >/dev/null 2>/dev/null; rm ' + fullpath)
