@@ -633,11 +633,12 @@ def flag_s1b_esds(esds, framespd):
     return esds
 
 
-def fix_pod_offset(esds, using_orbits = False):
+def fix_pod_offset(esds, using_orbits = False, previously_corrected = True):
     """Function to fix the shift after new orbits in 2020-07-29/30, either using real POD diff if possible (if in LiCSAR), or applying 39 mm constant value.
     Args:
         esds (pd.Dataframe):   as loaded (i.e. with the relevant daz columns)
         using_orbits (bool):   if True, it will try use directly PODs to find diff (only with daz_lib_licsar)
+        previously_corrected (bool):  was our dataset previously corrected for the 39 mm constant? (LiCSInfo has those corrected already. Only with using_orbits)
     Returns:
         pd.DataFrame :  original esds with applied correction
     """
@@ -691,6 +692,9 @@ def fix_pod_offset(esds, using_orbits = False):
                 ep = group[group.epochdate <= dt.datetime(2020,7,30).date() ]['pod_diff_azi_m']
                 offset_m = 0.039
                 esds.update(ep.subtract(offset_m))
+        if previously_corrected:
+            ep = esds[esds['pod_diff_azi_m'] != 0]['pod_diff_azi_m']+0.039
+            esds.update(ep)
         print('Correcting the final values in esds dataset')
         esds[col] = esds[col]+esds['pod_diff_azi_m']/14 # using directly 14 m resolution.. should be precise enough
     return esds
