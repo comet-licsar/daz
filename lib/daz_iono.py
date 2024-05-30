@@ -104,6 +104,8 @@ def get_tecs(glat, glon, altitude, acq_times, returnhei = False, source='iri', a
         source (str): source of TEC - either 'iri' for IRI2016 model (must be installed), or 'code' to autodownload from CODE
         alpha (float): for CODE only, estimate of ratio of TEC towards 'to the satellite only'. If 'auto', it will estimate it using iri. 0.85 is good value
     '''
+    if glon > 180:
+        glon = glon - 180  # fix round-earth
     if returnhei and source == 'code':
         print('WARNING, height is estimated only through IRI model, now setting to it')
         source = 'iri'
