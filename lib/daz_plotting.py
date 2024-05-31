@@ -8,7 +8,7 @@ import holoviews as hv
 from holoviews import opts
 hv.extension('bokeh')
 import simplekml
-
+import datetime as dt
 
 def plot_esds_from_pd(esds):
     """ will quickly plot esds taken by e.g. dazes=daz_lib_licsar.get_daz_frame(frame)
@@ -18,10 +18,11 @@ def plot_esds_from_pd(esds):
     (esds.set_index(esds.epochdate).daz*14000).plot()
 
 
-def plot_vel_esd(frame_esds, frameta, level1 = 'iono_grad', level2 = None, showitrf=True):
+def plot_vel_esd(frame_esds, frameta, level1 = 'iono_grad', level2 = None, showitrf=True,
+                 mindate = dt.date(2014, 11, 1), maxdate = dt.date(2024, 11, 1)):
     # level1: 'tide', 'orig', 'iono_grad', 'iono_f2'
-    global mindate
-    global maxdate
+    #global mindate
+    #global maxdate
     # ionotype - grad for gradient only (Gomba, 2016 - partial), f2 to use also the approach with F2 heights (Liang 2019)
     xmin = 0
     xmax = (maxdate-mindate).days/365.25
@@ -188,13 +189,28 @@ def export_esds2kml(framespd, esds, kmzfile = 'esds.kmz', level1 = 'tide', level
     os.mkdir('plots')
     kml = simplekml.Kml()
     print('generating plots')
+    # getting min/max date
+    try:
+        allepochs = esds[esds.is_outlier_daz_mm == False].epochdate.values
+        allepochs.sort()
+        mindate = allepochs[0]
+        maxdate = allepochs[-1]
+    except:
+        print('Error getting min/max dates. Trying from all epochdates')
+        allepochs = esds.epochdate.values
+        allepochs.sort()
+        mindate = allepochs[0]
+        maxdate = allepochs[-1]
+    # extract years since the first date (careful, might be minus then...)
+    esds['years_since_beginning'] = esds['epochdate'] - mindate
+    esds['years_since_beginning'] = esds['years_since_beginning'].apply(lambda x: float(x.days) / 365.25)
     #this will generate plots
     for frame in framespd['frame']:
         frameta = framespd[framespd['frame']==frame]
         selected_frame_esds = esds[esds['frame'] == frame].copy()
         #frameplot = plot_vel_esd(selected_frame_esds, frameta, showtec = False)
         try:
-            frameplot = plot_vel_esd(selected_frame_esds, frameta, level2 = level2, level1 = level1, showitrf=True)
+            frameplot = plot_vel_esd(selected_frame_esds, frameta, level2 = level2, level1 = level1, showitrf=True, mindate = mindate, maxdate = maxdate)
             hv.save(frameplot, 'plots/{}.png'.format(frame), dpi=100, fmt='png')
         except:
             print('error generating plot for frame '+frameta['frame'])
