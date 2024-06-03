@@ -3,12 +3,15 @@
 from daz_lib import *
 
 #for visualisation and kml export
-import hvplot
-import holoviews as hv
-from holoviews import opts
-hv.extension('bokeh')
+#import hvplot
+#import holoviews as hv
+#from holoviews import opts
+#hv.extension('bokeh')
 import simplekml
 import datetime as dt
+
+# 2024 changing to pygmt from hv
+import pygmt
 
 def plot_esds_from_pd(esds):
     """ will quickly plot esds taken by e.g. dazes=daz_lib_licsar.get_daz_frame(frame)
@@ -17,7 +20,7 @@ def plot_esds_from_pd(esds):
         esds['epochdate'] = esds.apply(lambda x : pd.to_datetime(str(x.epoch)).date(), axis=1)
     (esds.set_index(esds.epochdate).daz*14000).plot()
 
-
+'''
 def plot_vel_esd(frame_esds, frameta, level1 = 'iono_grad', level2 = None, showitrf=True,
                  mindate = dt.date(2014, 11, 1), maxdate = dt.date(2024, 11, 1)):
     # level1: 'tide', 'orig', 'iono_grad', 'iono_f2'
@@ -174,7 +177,7 @@ def plot_vel_esd(frame_esds, frameta, level1 = 'iono_grad', level2 = None, showi
     hvplot = hvplot.opts(xlabel='', ylabel='azimuth shift [mm]', ylim=(-300, 300), show_legend=True)
     hvplot = hvplot.options(width=900, height=350)
     return hvplot
-
+'''
 
 
 
@@ -210,10 +213,13 @@ def export_esds2kml(framespd, esds, kmzfile = 'esds.kmz', level1 = 'tide', level
         selected_frame_esds = esds[esds['frame'] == frame].copy()
         #frameplot = plot_vel_esd(selected_frame_esds, frameta, showtec = False)
         try:
-            frameplot = plot_vel_esd(selected_frame_esds, frameta, level2 = level2, level1 = level1, showitrf=True, mindate = mindate, maxdate = maxdate)
-            hv.save(frameplot, 'plots/{}.png'.format(frame), dpi=100, fmt='png')
+            #frameplot = plot_vel_esd(selected_frame_esds, frameta, level2 = level2, level1 = level1, showitrf=True, mindate = mindate, maxdate = maxdate)
+            #hv.save(frameplot, 'plots/{}.png'.format(frame), dpi=100, fmt='png')
+            frameplot = plot_vel_esd_gmt(selected_frame_esds, frameta, level2=level2, level1=level1, showitrf=True,
+                                     mindate=mindate, maxdate=maxdate)
+            frameplot.savefig('plots/{}.png'.format(frame), dpi=150)
         except:
-            print('error generating plot for frame '+frameta['frame'])
+            print('error generating plot for frame '+frame)
     #this will generate kmz
     print('generating kml')
     for dirpass in [('A','ascending'),('D','descending')]:
@@ -233,6 +239,113 @@ def export_esds2kml(framespd, esds, kmzfile = 'esds.kmz', level1 = 'tide', level
     if clean:
         if os.path.exists(kmzfile):
             os.system('rm -r doc.kml plots')
+
+
+def plot_vel_esd_gmt(selected_frame_esds, frameta, mindate, maxdate, level1, level2=None, showitrf=True):
+    frame = frameta['frame'].values[0]
+    #
+    fig = pygmt.Figure()
+    #
+    fig.basemap(
+        projection="X18c/6c",
+        region=[mindate, maxdate, -300, 300], #datetime.date(2010, 1, 1), datetime.date(2020, 6, 1), 0, 10],
+        #frame=["WSen", "af"],
+        #frame=["WSne", "xaf", "yaf+l'daz [mm]'"]
+        frame=["a", "+t "+frame, "xafg", "yafg+ldaz [mm]"]
+    )
+    #
+    if level2:
+        fig = figpart_var(level1, selected_frame_esds, frameta, fig, additrf = (True & showitrf), plotstd = False)
+        fig = figpart_var(level2, selected_frame_esds, frameta, fig, additrf = (False & showitrf), plotstd = True)
+    else:
+        fig = figpart_var(level1, selected_frame_esds, frameta, fig, additrf = (True & showitrf), plotstd = True)
+    #
+    #print('legend')
+    fig.legend(position="JBL+jBL+o0.1c", box='+gwhite+p1p')
+    fig.basemap(frame=True) #["WSen", "af"])
+    #fig.show(dpi=120)
+    return fig
+
+
+def figpart_var(level, esdspart, frameta, fig, additrf=False, plotstd=False):
+    frame_esds = esdspart.copy()
+    #
+    if level == 'tide':
+        # which column
+        col_mm = 'daz_mm_notide'
+        col_outliers = 'is_outlier_' + col_mm
+        col_label = 'tide corrected'
+        # col_color = 'red'
+        col_color = 'olivedrab'
+        col_size = '0.1c'
+    elif level == 'iono_grad':
+        # or:
+        col_mm = 'daz_mm_notide_noiono_grad'
+        if not col_mm in frame_esds:
+            col_mm = 'daz_mm_notide_noiono'
+        col_outliers = 'is_outlier_' + col_mm
+        col_label = 'tide and iono corrected'
+        # col_color = 'olivedrab'
+        col_color = 'red'
+        col_size = '0.15c'
+        col_size = '0.2c'
+    #
+    # slopes..
+    slope = float(frameta['slope_' + col_mm + '_mmyear'].values[0])
+    intercept = float(frameta['intercept_' + col_mm + '_mmyear'].values[0])
+    std = float(frameta[col_mm + '_RMSE_selection'].values[0])
+    #rmse = float(frameta[col_mm + '_RMSE_full'].values[0])
+    rmse2 = float(frameta[col_mm + '_RMSE_mmy_full'].values[0])
+    #
+    years_since_beginning = frame_esds['years_since_beginning'].values
+    frame_esds['model'] = years_since_beginning * slope + intercept
+    frame_esds = frame_esds.set_index('years_since_beginning').sort_index()
+    frame_esds['years_since_beginning_dup'] = years_since_beginning
+    #
+    # get it center:
+    # sel=frame_esds[frame_esds[col_outliers] == False]
+    # central = float(sel[col_mm].mean())
+    # centralmodel = float(sel['model'].mean())
+    # frame_esds[col_mm] = frame_esds[col_mm] - central
+    # frame_esds['model'] = frame_esds['model'] - centralmodel
+    #
+    #print('first outliers')
+    sel = frame_esds[frame_esds[col_outliers] == True]
+    x = sel['epochdate'].values
+    y = sel[col_mm].values
+    #
+    # fig.plot(x=x, y=y, style="x"+col_size, pen="0.1p,"+col_color+'3')
+    # fig.plot(x=x, y=y, style="p0.08c", pen="0.1p,"+col_color)
+    fig.plot(x=x, y=y, style="c0.08c", pen="thin," + col_color + '3')
+    # fig.plot(x=x, y=y, style="x"+col_size, pen="1p,"+col_color+'3')
+    #
+    #print('main points')
+    sel = frame_esds[frame_esds[col_outliers] == False]
+    x = sel['epochdate'].values
+    y = sel[col_mm].values
+    fig.plot(x=x, y=y, style="p" + col_size, fill=col_color + '3', label=col_label)
+    #
+    #print('slope on notide')
+    # x=sel['epochdate'].values
+    y = sel['model'].values
+    title = 'vel: {0} +-{1} mm/y (95%)'.format(round(slope), round(2 * rmse2))
+    # title = 'vel: {0} +-{1} mm/y (95%)'.format(round(slope),round(rmse))
+    fig.plot(x=[x[0], x[-1]], y=[y[0], y[-1]], pen="3p," + col_color + '4', label=title)
+    #
+    if plotstd:
+        fig.plot(x=[x[0], x[-1]], y=[y[0] - 2 * std, y[-1] - 2 * std], pen="0.2p," + col_color + '4,-')
+        fig.plot(x=[x[0], x[-1]], y=[y[0] + 2 * std, y[-1] + 2 * std], pen="0.2p," + col_color + '4,-')
+    #
+    if additrf:
+        slope_itrf = float(frameta['slope_plates_vel_azi_itrf2014'].values[0])
+        title = 'ref vel (ITRF): {0} mm/y'.format(round(slope_itrf))
+        y1 = y[-1]
+        x0yrs = sel['years_since_beginning_dup'].values[0]
+        x1yrs = sel['years_since_beginning_dup'].values[-1]
+        yrsdiff = x1yrs - x0yrs
+        y0 = y1 - yrsdiff * slope_itrf
+        fig.plot(x=[x[0], x[-1]], y=[y0, y1], pen="2p,grey", label=title)
+    return fig
 
 
 ######### generate gmt plot (arrows)
