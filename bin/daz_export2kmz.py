@@ -27,7 +27,7 @@ v1.0 2022-01-03 Milan Lazecky, Uni of Leeds
 ######### update 2021-05-31: hopefully improved huber regression...
 
 '''
-from daz_lib import *
+from daz_lib import load_csvs
 from daz_plotting import *
 
 import getopt, os, sys

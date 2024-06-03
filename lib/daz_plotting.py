@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from daz_lib import *
+#from daz_lib import *
 
 #for visualisation and kml export
 #import hvplot
@@ -9,6 +9,10 @@ from daz_lib import *
 #hv.extension('bokeh')
 import simplekml
 import datetime as dt
+import pandas as pd
+import numpy as np
+import xarray as xr
+import glob, os
 
 # 2024 changing to pygmt from hv
 import pygmt

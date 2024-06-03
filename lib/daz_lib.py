@@ -4,21 +4,26 @@
 import pandas as pd
 import numpy as np
 import datetime as dt
-from scipy.constants import speed_of_light
-from scipy.constants import pi
-from scipy import signal
-from scipy.stats import linregress
-from sklearn.linear_model import HuberRegressor
-import xarray as xr
+try:
+    from scipy.constants import speed_of_light
+    from scipy.constants import pi
+    from scipy import signal
+    from scipy.stats import linregress
+    from sklearn.linear_model import HuberRegressor
+    #
+    import urllib
+    import requests
+    from lxml import html
+    #
+    import geopandas
+    import shapely
+except:
+    print('some libraries were not loaded (still ok for plotting)')
 
+
+import xarray as xr
 import glob, os
 
-import urllib
-import requests
-from lxml import html
-
-import geopandas
-import shapely
 
 # load the csvs
 def load_csvs(esdscsv = 'esds.csv', framescsv = 'frames.csv', core_init = False):
