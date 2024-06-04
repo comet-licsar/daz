@@ -213,8 +213,10 @@ def export_esds2kml(framespd, esds, kmzfile = 'esds.kmz', level1 = 'tide', level
     esds['years_since_beginning'] = esds['years_since_beginning'].apply(lambda x: float(x.days) / 365.25)
     #this will generate plots
     lenframes = len(framespd['frame'])
-    for i, frame in framespd['frame'].iteritems():
-        print('  Running for {0:6}/{1:6}th frame...'.format(i + 1, lenframes), flush=True, end='\r')
+    i = 0
+    for frame in framespd['frame']:
+        i=i+1
+        print('  Running for {0:6}/{1:6}th frame...'.format(i, lenframes), flush=True, end='\r')
         frameta = framespd[framespd['frame']==frame]
         selected_frame_esds = esds[esds['frame'] == frame].copy()
         #frameplot = plot_vel_esd(selected_frame_esds, frameta, showtec = False)
