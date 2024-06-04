@@ -212,7 +212,9 @@ def export_esds2kml(framespd, esds, kmzfile = 'esds.kmz', level1 = 'tide', level
     esds['years_since_beginning'] = esds['epochdate'] - mindate
     esds['years_since_beginning'] = esds['years_since_beginning'].apply(lambda x: float(x.days) / 365.25)
     #this will generate plots
-    for frame in framespd['frame']:
+    lenframes = len(framespd['frame'])
+    for i, frame in framespd['frame'].iteritems():
+        print('  Running for {0:6}/{1:6}th frame...'.format(i + 1, lenframes), flush=True, end='\r')
         frameta = framespd[framespd['frame']==frame]
         selected_frame_esds = esds[esds['frame'] == frame].copy()
         #frameplot = plot_vel_esd(selected_frame_esds, frameta, showtec = False)
@@ -298,7 +300,7 @@ def figpart_var(level, esdspart, frameta, fig, additrf=False, plotstd=False):
     slope = float(frameta['slope_' + col_mm + '_mmyear'].values[0])
     intercept = float(frameta['intercept_' + col_mm + '_mmyear'].values[0])
     std = float(frameta[col_mm + '_RMSE_selection'].values[0])
-    #rmse = float(frameta[col_mm + '_RMSE_full'].values[0])
+    rmse = float(frameta[col_mm + '_RMSE_full'].values[0])
     rmse2 = float(frameta[col_mm + '_RMSE_mmy_full'].values[0])
     #
     years_since_beginning = frame_esds['years_since_beginning'].values
@@ -313,24 +315,37 @@ def figpart_var(level, esdspart, frameta, fig, additrf=False, plotstd=False):
     # frame_esds[col_mm] = frame_esds[col_mm] - central
     # frame_esds['model'] = frame_esds['model'] - centralmodel
     #
-    #print('first outliers')
-    sel = frame_esds[frame_esds[col_outliers] == True]
-    x = sel['epochdate'].values
-    y = sel[col_mm].values
+    for ab in ['A', 'B']:
+        frame_esds_ab = frame_esds[frame_esds['S1AorB'] == ab]
+        if frame_esds_ab.empty:
+            continue
+        if ab == 'A':
+            symbol = 'c'
+        elif ab == 'B':
+            symbol = 't'
+        # print('first outliers')
+        sel = frame_esds_ab[frame_esds_ab[col_outliers] == True]
+        x = sel['epochdate'].values
+        y = sel[col_mm].values
+        #
+        # fig.plot(x=x, y=y, style="x"+col_size, pen="0.1p,"+col_color+'3')
+        # fig.plot(x=x, y=y, style="p0.08c", pen="0.1p,"+col_color)
+        fig.plot(x=x, y=y, style=symbol + "0.08c", pen="thin," + col_color + '3')
+        # fig.plot(x=x, y=y, style="x"+col_size, pen="1p,"+col_color+'3')
+        #
+        # print('main points')
+        sel = frame_esds_ab[frame_esds_ab[col_outliers] == False]
+        x = sel['epochdate'].values
+        y = sel[col_mm].values
+        if ab == 'A':
+            fig.plot(x=x, y=y, style=symbol + col_size, fill=col_color + '3', pen='0.1p,' + col_color + '4',
+                     label=col_label)
+        else:
+            fig.plot(x=x, y=y, style=symbol + col_size, fill=col_color + '3', pen='0.1p,' + col_color + '4')
     #
-    # fig.plot(x=x, y=y, style="x"+col_size, pen="0.1p,"+col_color+'3')
-    # fig.plot(x=x, y=y, style="p0.08c", pen="0.1p,"+col_color)
-    fig.plot(x=x, y=y, style="c0.08c", pen="thin," + col_color + '3')
-    # fig.plot(x=x, y=y, style="x"+col_size, pen="1p,"+col_color+'3')
-    #
-    #print('main points')
+    # print('slope on notide')
     sel = frame_esds[frame_esds[col_outliers] == False]
     x = sel['epochdate'].values
-    y = sel[col_mm].values
-    fig.plot(x=x, y=y, style="p" + col_size, fill=col_color + '3', label=col_label)
-    #
-    #print('slope on notide')
-    # x=sel['epochdate'].values
     y = sel['model'].values
     title = 'vel: {0} +-{1} mm/y (95%)'.format(round(slope), round(2 * rmse2))
     # title = 'vel: {0} +-{1} mm/y (95%)'.format(round(slope),round(rmse))
