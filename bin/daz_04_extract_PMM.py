@@ -18,13 +18,15 @@ Outputs :
 =====
 Usage
 =====
-daz_04_extract_PMM.py [--infra frames.csv] [--outfra frames_with_itrf.csv] [--velnc vel_gps_kreemer.nc]
+daz_04_extract_PMM.py [--add_eu] [--infra frames.csv] [--outfra frames_with_itrf.csv] [--velnc vel_gps_kreemer.nc]
 
 Note: param velnc is optional, but if provided as nc file with VEL_E, VEL_N variables, it will be used as GPS velocities.
-
+--add_eu will extract also ITRF2014 PMM EU along-track direction (ATD) that can be then used to transform the ATD velocities.
 """
 #%% Change log
 '''
+v1.1 2024-06 ML
+ - add EU in ATD
 v1.0 2022-01-03 Milan Lazecky, Uni of Leeds
  - Original implementation - based on codes from 2021-06-24
 '''
@@ -49,16 +51,20 @@ def main(argv=None):
     inframesfile = 'frames_with_iono.csv'
     outframesfile = 'frames_with_itrf.csv'
     velnc = 'vel_gps_kreemer.nc'
+    add_eu = False
+
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "h", ["help", "infra=", "outfra=", "velnc="])
+            opts, args = getopt.getopt(argv[1:], "h", ["help", "add_eu", "infra=", "outfra=", "velnc="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
             if o == '-h' or o == '--help':
                 print(__doc__)
                 return 0
+            elif o == "--add_eu":
+                add_eu = True
             elif o == "--infra":
                 inframesfile = a
             elif o == "--outfra":
@@ -85,7 +91,10 @@ def main(argv=None):
     print('getting plate motion model values using the average for the 222x222 km around the frame centre')
     print('(using ITRF2014 and external nc file for GPS, if available)')
     #framespd = df_get_itrf_slopes(framespd)
-    framespd = df_get_itrf_gps_slopes(framespd, velnc=velnc)
+    framespd = df_get_itrf_gps_slopes(framespd, velnc=velnc, add_eu = add_eu)
+    if add_eu:
+        print('Finished extracting both NNR and EU PMM values. Note:')
+        print("framespd['vel_eur'] = framespd['slope_from_daz'] - framespd['slope_vel_itrf_nnr'] + framespd['slope_vel_itrf_eu']")
     framespd.to_csv(outframesfile)
     print('done')
 
@@ -98,4 +107,5 @@ if __name__ == "__main__":
 some notes that might be relevant:
 gridagg['GPS_N_2014_EU'] = gridagg['GPS_N'] - gridagg['ITRF_N_2008'] + gridagg['ITRF_2014_EU_N']
 gridagg['GPS_E_2014_EU'] = gridagg['GPS_E'] - gridagg['ITRF_E_2008'] + gridagg['ITRF_2014_EU_E']
+framespd['vel_eur'] = framespd['slope_from_daz'] - framespd['slope_vel_itrf_nnr'] + framespd['slope_vel_itrf_eu']
 '''
