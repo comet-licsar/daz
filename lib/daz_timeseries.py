@@ -59,7 +59,11 @@ def correct_s1ab(esds, framespd, cols = ['daz_mm', 'daz_mm_notide', 'daz_mm_noti
     if 'S1AB_offset' not in framespd:
         print('ERROR, S1AB_offset not in framespd, cancelling')
         return esds, framespd
+    i=0
+    lenframes = len(framespd['frame'])
     for frame in framespd['frame']:
+        i=i+1
+        print('  Running for {0:6}/{1:6}th frame...'.format(i, lenframes), flush=True, end='\r')
         frameta = framespd[framespd['frame'] == frame].copy()
         selected_frame_esds = esds[esds['frame'] == frame].copy()
         selected_frame_esds = selected_frame_esds[selected_frame_esds['S1AorB']=='B']  #[framespd['stderr_daz_rmseiter_mm']>0]

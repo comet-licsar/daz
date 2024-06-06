@@ -102,7 +102,7 @@ def main(argv=None):
     #esds = pd.read_csv(indazfile)
     #framespd = pd.read_csv(inframesfile)
     esds, framespd = load_csvs(esdscsv = indazfile, framescsv = inframesfile)
-    
+
     # setting 'subset' - means, only data > 2016-03-01 as before it is too noisy
     #subset = True
     if subset:
