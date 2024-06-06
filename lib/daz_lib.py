@@ -257,7 +257,7 @@ def get_ITRF_ENU(lat, lon, model='itrf2014', refto='NNR'):
 
 
 #get ITRF averages within the frames
-def df_get_itrf_gps_slopes(framespd, velnc='vel_gps_kreemer.nc'):
+def df_get_itrf_gps_slopes(framespd, velnc='vel_gps_kreemer.nc', add_eu = True):
     '''
     will get both itrf 2014 pmm and gps stations averages, converted to LOS of frames in framespd
     '''
@@ -268,7 +268,7 @@ def df_get_itrf_gps_slopes(framespd, velnc='vel_gps_kreemer.nc'):
         framespd['slope_plates_vel_azi_gps'] = 0.0
     print('converting to LOS')
     for ind,frameta in framespd.iterrows():
-        frame = frameta['frame']
+        #frame = frameta['frame']
         heading = frameta['heading']
         N = frameta['ITRF_N']
         E = frameta['ITRF_E']
@@ -277,6 +277,17 @@ def df_get_itrf_gps_slopes(framespd, velnc='vel_gps_kreemer.nc'):
             N = frameta['GPS_N']
             E = frameta['GPS_E']
             framespd.at[ind, 'slope_plates_vel_azi_gps'] = EN2azi(N, E, heading)
+    if add_eu:
+        print('repeating for Eurasia-referenced framework')
+        framespd = framespd.rename({'ITRF_N': 'ITRF_N_NNR', 'ITRF_E': 'ITRF_E_NNR'})
+        framespd = get_itrf_gps_EN(framespd, samplepoints=3, velnc=None, refto='EU', rowname='center')
+        for ind, frameta in framespd.iterrows():
+            # frame = frameta['frame']
+            heading = frameta['heading']
+            N = frameta['ITRF_N']
+            E = frameta['ITRF_E']
+            framespd.at[ind, 'slope_plates_vel_azi_itrf2014_eur'] = EN2azi(N, E, heading)
+        framespd = framespd.rename({'ITRF_N':'ITRF_N_EUR', 'ITRF_E':'ITRF_E_EUR'})
     return framespd
 
 
@@ -353,10 +364,11 @@ def get_itrf_gps_EN(df, samplepoints=3, velnc='vel_gps_kreemer.nc', refto='NNR',
     Basically, I used the existing velocities and correctly georeferenced them to WGS-84 frame, stored as 1 deg grid in NetCDF
     '''
     usevel = False
-    if os.path.exists(velnc):
-        print('found velocities nc file - using it instead of ITRF2014')
-        vels=xr.open_dataset(velnc)
-        usevel = True
+    if velnc:
+        if os.path.exists(velnc):
+            print('found velocities nc file - using it instead of ITRF2014')
+            vels=xr.open_dataset(velnc)
+            usevel = True
     itrfs_N = []
     itrfs_E = []
     itrfs_rms_N = []
