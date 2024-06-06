@@ -64,7 +64,7 @@ def correct_s1ab(esds, framespd, cols = ['daz_mm', 'daz_mm_notide', 'daz_mm_noti
         selected_frame_esds = esds[esds['frame'] == frame].copy()
         selected_frame_esds = selected_frame_esds[selected_frame_esds['S1AorB']=='B']  #[framespd['stderr_daz_rmseiter_mm']>0]
         s1aboff = float(frameta['S1AB_offset'].values[0])
-        if frameta['stderr_daz_rmseiter_mm'] < stderr_thres:
+        if float(frameta['stderr_daz_rmseiter_mm'].values[0]) < stderr_thres:
             selected_frame_esds[cols] = selected_frame_esds[cols] - s1aboff
         esds.update(selected_frame_esds)
     return esds, framespd
