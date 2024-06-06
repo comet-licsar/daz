@@ -52,7 +52,7 @@ def estimate_s1ab_allframes(esds, framespd, col = 'daz_mm_notide_noiono', rmsite
         framespd.update(frameta)
     return framespd
 
-def correct_s1ab(esds, framespd, cols = ['daz_mm', 'daz_mm_notide', 'daz_mm_notide_noiono'], stderr_thres = 60):
+def correct_s1ab(esds, framespd, cols = ['daz_mm', 'daz_mm_notide', 'daz_mm_notide_noiono'], stderr_thres = 100):
     '''
     Will apply S1AB offset to given columns in esds pd, in case the stderr_daz_rmseiter_mm is lower than stderr_thres
     '''
