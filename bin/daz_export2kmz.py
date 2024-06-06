@@ -84,7 +84,14 @@ def main(argv=None):
     #esds = pd.read_csv(indazfile)
     #framespd = pd.read_csv(inframesfile)
     esds, framespd = load_csvs(esdscsv = indazfile, framescsv = inframesfile)
-    export_esds2kml(framespd, esds, kmzfile = outkmzfile, overwrite = True, clean = False)
+    if 'daz_mm_final' in esds:
+        print('final values detected (2024/06: means after tide-iono-s1ab correction)')
+        l1 = 'tide'
+        l2 = 'final'
+    else:
+        l1 = 'tide'
+        l2 = 'iono'
+    export_esds2kml(framespd, esds, level1 = l1, level2 = l2, kmzfile = outkmzfile, overwrite = True, clean = False)
     print('done')
 
 #%% main

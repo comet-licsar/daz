@@ -276,6 +276,9 @@ def plot_vel_esd_gmt(selected_frame_esds, frameta, mindate, maxdate, level1, lev
 
 
 def figpart_var(level, esdspart, frameta, fig, additrf=False, plotstd=False):
+    '''
+    Level should be one of ['tide', 'iono', 'final']
+    '''
     frame_esds = esdspart.copy()
     #
     if level == 'tide':
@@ -286,13 +289,21 @@ def figpart_var(level, esdspart, frameta, fig, additrf=False, plotstd=False):
         # col_color = 'red'
         col_color = 'olivedrab'
         col_size = '0.1c'
-    elif level == 'iono_grad':
+    elif (level == 'iono_grad' or level == 'iono'):
         # or:
         col_mm = 'daz_mm_notide_noiono_grad'
         if not col_mm in frame_esds:
             col_mm = 'daz_mm_notide_noiono'
         col_outliers = 'is_outlier_' + col_mm
         col_label = 'tide and iono corrected'
+        # col_color = 'olivedrab'
+        col_color = 'red'
+        col_size = '0.15c'
+        col_size = '0.2c'
+    elif level == 'final':
+        col_mm = 'daz_mm_final'
+        col_outliers = 'is_outlier_' + col_mm
+        col_label = 'tide-iono-s1ab corrected'
         # col_color = 'olivedrab'
         col_color = 'red'
         col_size = '0.15c'

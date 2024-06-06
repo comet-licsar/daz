@@ -6,8 +6,112 @@ from daz_lib import *
 #######################################
 # step 5 - estimate velocities (and remove outliers etc.)
 ###################
+
 def get_rmse(y, y_pred, ddof=2):
     return np.sqrt( np.sum(np.square(y - y_pred)) / (len(y)-ddof) )
+
+
+### S1AB offset calculation:
+def estimate_s1ab(frame_esds, col = 'daz_mm_notide_noiono', rmsiter = 50, printout = True):
+    #epochdates = frame_esds['epochdate'].values
+    isB = (frame_esds.S1AorB == 'B').values * 1
+    if (np.sum(isB) < 20 and len(isB[isB == 0]) < 20) or (np.sum(isB) < 10):
+        isB = isB * 0
+        # print('cancelling for cAB')
+    years = frame_esds.years_since_beginning.values
+    dazes = frame_esds[col].values
+    A = np.vstack((years,np.ones_like(years),isB)).T
+    #res = model_filter(A, dazes, iters=rmsiter,years_to_pod=years_to_pod)
+    res = model_filter_v2(A, dazes, iters=rmsiter, target_rmse = 30, printout = printout)
+    model=res[0]
+    stderr=res[1]
+    v = model[0]
+    c = model[1]
+    c_AB = model[2]
+    # now what to return:
+    return v,c,stderr,c_AB
+
+
+def estimate_s1ab_allframes(esds, framespd, col = 'daz_mm_notide_noiono', rmsiter = 50):
+    lenframes = len(framespd['frame'])
+    framespd['S1AB_offset'] = 0.0
+    framespd['slope_daz_rmseiter_mmyear']=0.0
+    framespd['intercept_daz_rmseiter_mmyear'] = 0.0
+    framespd['stderr_daz_rmseiter_mm'] = 0.0
+    i = 0
+    for frame in framespd['frame']:
+        i=i+1
+        print('  Running for {0:6}/{1:6}th frame...'.format(i, lenframes), flush=True, end='\r')
+        frameta = framespd[framespd['frame']==frame].copy()
+        selected_frame_esds = esds[esds['frame'] == frame].copy()
+        v,c,stderr,c_AB = estimate_s1ab(selected_frame_esds, col = col, rmsiter = rmsiter, printout = False)
+        frameta['slope_daz_rmseiter_mmyear'] = v
+        frameta['S1AB_offset'] = c_AB
+        frameta['intercept_daz_rmseiter_mmyear']=c
+        frameta['stderr_daz_rmseiter_mm'] = stderr
+        framespd.update(frameta)
+    return framespd
+
+def correct_s1ab(esds, framespd, cols = ['daz_mm', 'daz_mm_notide', 'daz_mm_notide_noiono']):
+    '''
+    Will apply S1AB offset to given columns in esds pd.
+    '''
+    if 'S1AB_offset' not in framespd:
+        print('ERROR, S1AB_offset not in framespd, cancelling')
+        return esds, framespd
+    for frame in framespd['frame']:
+        frameta = framespd[framespd['frame'] == frame].copy()
+        selected_frame_esds = esds[esds['frame'] == frame].copy()
+        s1aboff = float(frameta['S1AB_offset'].values[0])
+        selected_frame_esds[cols] = selected_frame_esds[cols] - s1aboff
+        esds.update(selected_frame_esds)
+    return esds, framespd
+
+# reduced version, 2024
+def model_filter_v2(A, y, limrms=3, iters=2, target_rmse = 30, full_stderr = False, weighted = False, printout = True):
+    '''
+    limrms is 'how many RMSEs should be used to remove outliers'
+    '''
+    model = np.linalg.lstsq(A,y, rcond=False)[0]
+    ddof = A.shape[1]
+    y_pred = np.sum(A*model,axis=1)
+    rmse = get_rmse(y, y_pred, ddof=ddof)
+    oldrmse = rmse
+    oldlen = len(y)
+    for i in range(iters):
+        count = len(y)
+        # reducing dataset
+        sel = np.abs(y_pred - y)<(limrms*rmse)
+        y = y[sel]
+        if len(y) == count:
+            sel = np.abs(y_pred - y) < ((limrms - 1) * rmse)
+            y = y[sel]
+        if len(y)==count:
+            break
+        A = A[sel]
+        # second iteration (only)
+        model = np.linalg.lstsq(A,y, rcond=False)[0]
+        y_pred = np.sum(A*model,axis=1)
+        rmse = get_rmse(y, y_pred, ddof=ddof)
+        #print('vel: '+str(model[0]) +'+-'+str(rmse))
+        #print('len: '+str(len(y)))
+        if rmse < target_rmse:
+            break
+    if printout:
+        print('RMSE diff: '+str(oldrmse)+' -> '+str(rmse)+' ('+str(oldlen)+'/'+str(len(y))+' samples)')
+    if weighted:
+        print('not done, as perhaps not needed')
+    if full_stderr:
+        #properly calculate std errors of model parameters
+        # here just assuming sigma of each observation based on expected meas. limits (7 mm processing, 10 mm rmse of satellite position)
+        sigma = np.sqrt(7*7 + 100)
+        try:
+            stderr = get_model_sigma(sigma, A)
+        except:
+            stderr = np.nan
+    else:
+        stderr = rmse
+    return model, stderr
 
 
 def model_filter(A, y, limrms=3, iters=2):

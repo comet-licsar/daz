@@ -18,11 +18,15 @@ Outputs :
 =====
 Usage
 =====
-daz_05_calculate_slopes.py [--indaz esds_with_iono.csv] [--infra frames_with_itrf.csv] [--outfra frames_final.csv] [--outdaz esds_final.csv]
+daz_05_calculate_slopes.py [--s1ab] [--indaz esds_with_iono.csv] [--infra frames_with_itrf.csv] [--outfra frames_final.csv] [--outdaz esds_final.csv]
 
+Parameters:
+    --s1ab ... also estimate (and store to outfra) the s1ab offset prior to velocity estimation. Now done only for the noiono+notide (final) daz
 """
 #%% Change log
 '''
+v1.1 2024-04-06 ML
+ - added S1AB offset estimation
 v1.0 2022-01-03 Milan Lazecky, Uni of Leeds
  - Original implementation - based on codes from 2021-06-24
 '''
@@ -52,17 +56,20 @@ def main(argv=None):
     outframesfile = 'frames_final.csv'
     # for skipping roll assistance - as e.g. Turkey is not correct in ITR2014 PMM
     roll_assist = True
+    s1ab = False
     
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "h", ["help", "indaz=", "infra=", "outdaz=", "outfra="])
+            opts, args = getopt.getopt(argv[1:], "h", ["help", "s1ab", "indaz=", "infra=", "outdaz=", "outfra="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
             if o == '-h' or o == '--help':
                 print(__doc__)
                 return 0
+            elif o == "--s1ab":
+                s1ab = True
             elif o == "--indaz":
                 indazfile = a
             elif o == "--infra":
@@ -112,9 +119,18 @@ def main(argv=None):
         esds.update(ep.subtract(-39))
     '''
     # setting 'subset' - means, only data > 2016-03-01 as before it is too noisy
-    subset = True
+    #subset = True
+    if subset:
+        print('Subsetting dataset to include only data after 2016-03-01')
+        esds = esds[esds['epochdate'] > pd.Timestamp('2016-03-01')]
+    if s1ab:
+        # estimate the offset first, then apply correction, and then use Huber as usual
+        framespd = estimate_s1ab_allframes(esds, framespd, col = 'daz_mm_notide_noiono', rmsiter = 50)
+        print('Applying S1AB corrections (only to daz_mm_notide_noiono and stored as daz_mm_final)')
+        esds['daz_mm_final'] = esds['daz_mm_notide_noiono'].copy()
+        esds, framespd = correct_s1ab(esds, framespd, cols=['daz_mm_final'])
     # 2021-10-12: the original way:
-    for col in ['daz_mm', 'daz_mm_notide', 'daz_mm_notide_noiono_grad', 'daz_mm_notide_noiono_iri', 'daz_mm_notide_noiono']:
+    for col in ['daz_mm', 'daz_mm_notide', 'daz_mm_notide_noiono_grad', 'daz_mm_notide_noiono_iri', 'daz_mm_notide_noiono','daz_mm_final']:
         if col in esds:
             print('estimating velocities of '+col)
             esds, framespd = df_calculate_slopes(esds, framespd, alpha = 1, eps = 1.35, bycol = col, subset = subset, roll_assist = roll_assist)
