@@ -21,7 +21,8 @@ Usage
 daz_05_calculate_slopes.py [--s1ab] [--indaz esds_with_iono.csv] [--infra frames_with_itrf.csv] [--outfra frames_final.csv] [--outdaz esds_final.csv]
 
 Parameters:
-    --s1ab ... also estimate (and store to outfra) the s1ab offset prior to velocity estimation. Now done only for the noiono+notide (final) daz
+    --s1ab ...... also estimate (and store to outfra) the s1ab offset prior to velocity estimation. Now done only for the noiono+notide (final) daz
+    --nosubset .. by default, we limit the dataset to start since March 2016 as it appeared too noisy before. This can be adjusted/cancelled using this switch.
 """
 #%% Change log
 '''
@@ -57,11 +58,12 @@ def main(argv=None):
     # for skipping roll assistance - as e.g. Turkey is not correct in ITR2014 PMM
     roll_assist = True
     s1ab = False
+    subset = True
     
     #%% Read options
     try:
         try:
-            opts, args = getopt.getopt(argv[1:], "h", ["help", "s1ab", "indaz=", "infra=", "outdaz=", "outfra="])
+            opts, args = getopt.getopt(argv[1:], "h", ["help", "s1ab", "nosubset", "indaz=", "infra=", "outdaz=", "outfra="])
         except getopt.error as msg:
             raise Usage(msg)
         for o, a in opts:
@@ -70,6 +72,8 @@ def main(argv=None):
                 return 0
             elif o == "--s1ab":
                 s1ab = True
+            elif o == "--nosubset":
+                subset = False
             elif o == "--indaz":
                 indazfile = a
             elif o == "--infra":
@@ -99,25 +103,6 @@ def main(argv=None):
     #framespd = pd.read_csv(inframesfile)
     esds, framespd = load_csvs(esdscsv = indazfile, framescsv = inframesfile)
     
-    '''
-    # step 6+ -- correct for daz_ARP=-39 mm: 29th July for S1A and 30th July for S1B
-    #
-    # update 2022-12-07 - now done in the step daz_01 already
-    #################
-    cols = ['daz_mm','daz_mm_notide', 'daz_mm_notide_noiono_grad']
-    if ('s1AorB' in framespd.columns) and ('s1AorB' not in esds.columns):
-        # ok, we can flag S1A/B and be more precise
-        esds = flag_s1b_esds(esds, framespd)
-        Bs = [esds['s1AorB']=='B']
-        epB = Bs[Bs.epochdate => pd.Timestamp('2020-07-30')][cols]
-        esds.update(epB.subtract(-39))
-        As = [esds['s1AorB']=='A']
-        epA = As[As.epochdate => pd.Timestamp('2020-07-29')][cols]
-        esds.update(epA.subtract(-39))
-    else:
-        ep = esds[esds.epochdate => pd.Timestamp('2020-07-30')][cols]
-        esds.update(ep.subtract(-39))
-    '''
     # setting 'subset' - means, only data > 2016-03-01 as before it is too noisy
     #subset = True
     if subset:
