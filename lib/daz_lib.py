@@ -638,12 +638,11 @@ def flag_s1b_esds(esds, framespd):
     return esds
 
 
-def fix_pod_offset(esds, using_orbits = False, previously_corrected = True):
+def fix_pod_offset(esds, using_orbits = False):
     """Function to fix the shift after new orbits in 2020-07-29/30, either using real POD diff if possible (if in LiCSAR), or applying 39 mm constant value.
     Args:
         esds (pd.Dataframe):   as loaded (i.e. with the relevant daz columns)
         using_orbits (bool):   if True, it will try use directly PODs to find diff (only with daz_lib_licsar)
-        previously_corrected (bool):  was our dataset previously corrected for the 39 mm constant? (LiCSInfo has those corrected already. Only with using_orbits)
     Returns:
         pd.DataFrame :  original esds with applied correction
     """
@@ -673,7 +672,8 @@ def fix_pod_offset(esds, using_orbits = False, previously_corrected = True):
                 continue
             epochs = []
             epochs = epochs + dazes[dazes['orbfile']==''].epoch.to_list()
-            epochs = epochs + dazes[dazes['orbfile']=='fixed_as_in_GRL'].epoch.to_list()
+            epochsprevfixed = dazes[dazes['orbfile']=='fixed_as_in_GRL'].epoch.to_list()
+            epochs = epochs + epochsprevfixed
             if not epochs:
                 print('Frame '+frame+' seems fully processed with new orbits. Skipping')
                 continue
@@ -697,34 +697,17 @@ def fix_pod_offset(esds, using_orbits = False, previously_corrected = True):
                 ep = group[group.epochdate <= dt.datetime(2020,7,30).date() ]['pod_diff_azi_m']
                 offset_m = 0.039
                 esds.update(ep.subtract(offset_m))
-        if previously_corrected:
-            ep = esds[esds['pod_diff_azi_m'] != 0]['pod_diff_azi_m']+0.039
-            esds.update(ep)
+
+            if epochsprevfixed:
+                for epoch in epochsprevfixed:
+                    # for GRL we used -39 mm, so need to add this constant back
+                    ep = group[group.epochdate == epoch]['pod_diff_azi_m']
+                    ep = ep[ep != 0]
+                    esds.update(ep+0.039)
         print('Correcting the final values in esds dataset')
-        esds[col] = esds[col]+esds['pod_diff_azi_m']/14 # using directly 14 m resolution.. should be precise enough
+        esds[col] = esds[col]+esds['pod_diff_azi_m']/14 # using directly 14 m resolution.. should be accurate enough
     return esds
 
-
-'''
-previously i was doing opposite, not ok for updates:
-    esds, framespd = load_csvs(esdscsv = indazfile, framescsv = inframesfile)
-    
-    # step 6+ -- correct for daz_ARP=-39 mm: 29th July for S1A and 30th July for S1B
-    #################
-    cols = ['daz_mm','daz_mm_notide', 'daz_mm_notide_noiono_grad']
-    if ('s1AorB' in framespd.columns) and ('s1AorB' not in esds.columns):
-        # ok, we can flag S1A/B and be more precise
-        esds = flag_s1b_esds(esds, framespd)
-        Bs = [esds['s1AorB']=='B']
-        epB = Bs[Bs.epochdate => pd.Timestamp('2020-07-30')][cols]
-        esds.update(epB.subtract(-39))
-        As = [esds['s1AorB']=='A']
-        epA = As[As.epochdate => pd.Timestamp('2020-07-29')][cols]
-        esds.update(epA.subtract(-39))
-    else:
-        ep = esds[esds.epochdate => pd.Timestamp('2020-07-30')][cols]
-        esds.update(ep.subtract(-39))
-'''
 
 def get_pod_offset(dazes, years, thresyears = 4, minsamples = 15):
     r2 = np.ones_like(years)

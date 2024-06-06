@@ -52,9 +52,9 @@ def estimate_s1ab_allframes(esds, framespd, col = 'daz_mm_notide_noiono', rmsite
         framespd.update(frameta)
     return framespd
 
-def correct_s1ab(esds, framespd, cols = ['daz_mm', 'daz_mm_notide', 'daz_mm_notide_noiono']):
+def correct_s1ab(esds, framespd, cols = ['daz_mm', 'daz_mm_notide', 'daz_mm_notide_noiono'], stderr_thres = 60):
     '''
-    Will apply S1AB offset to given columns in esds pd.
+    Will apply S1AB offset to given columns in esds pd, in case the stderr_daz_rmseiter_mm is lower than stderr_thres
     '''
     if 'S1AB_offset' not in framespd:
         print('ERROR, S1AB_offset not in framespd, cancelling')
@@ -62,8 +62,10 @@ def correct_s1ab(esds, framespd, cols = ['daz_mm', 'daz_mm_notide', 'daz_mm_noti
     for frame in framespd['frame']:
         frameta = framespd[framespd['frame'] == frame].copy()
         selected_frame_esds = esds[esds['frame'] == frame].copy()
+        selected_frame_esds = selected_frame_esds[selected_frame_esds['S1AorB']=='B']  #[framespd['stderr_daz_rmseiter_mm']>0]
         s1aboff = float(frameta['S1AB_offset'].values[0])
-        selected_frame_esds[cols] = selected_frame_esds[cols] - s1aboff
+        if frameta['stderr_daz_rmseiter_mm'] < stderr_thres:
+            selected_frame_esds[cols] = selected_frame_esds[cols] - s1aboff
         esds.update(selected_frame_esds)
     return esds, framespd
 

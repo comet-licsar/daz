@@ -124,6 +124,7 @@ def main(argv=None):
         print('Subsetting dataset to include only data after 2016-03-01')
         esds = esds[esds['epochdate'] > pd.Timestamp('2016-03-01')]
     if s1ab:
+        print('Estimating S1AB offset per frame')
         # estimate the offset first, then apply correction, and then use Huber as usual
         framespd = estimate_s1ab_allframes(esds, framespd, col = 'daz_mm_notide_noiono', rmsiter = 50)
         print('Applying S1AB corrections (only to daz_mm_notide_noiono and stored as daz_mm_final)')

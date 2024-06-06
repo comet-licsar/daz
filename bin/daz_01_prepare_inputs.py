@@ -117,7 +117,7 @@ def main(argv=None):
 
     if orbdiff_fix:
         print('fixing the orb diff values in '+indazfile)
-        esds = fix_pod_offset(esds, using_orbits=using_orbits, previously_corrected = True)
+        esds = fix_pod_offset(esds, using_orbits=using_orbits)
     
     # some other details to prepare:
     print('flagging S1A/B per temporal sample')
