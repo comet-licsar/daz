@@ -259,7 +259,7 @@ def plot_vel_esd_gmt(selected_frame_esds, frameta, mindate, maxdate, level1, lev
         region=[mindate, maxdate, -300, 300], #datetime.date(2010, 1, 1), datetime.date(2020, 6, 1), 0, 10],
         #frame=["WSen", "af"],
         #frame=["WSne", "xaf", "yaf+l'daz [mm]'"]
-        frame=["a", "+t "+frame, "xafg", "yafg+ldaz [mm]"]
+        frame=["+t "+frame, "xa1Yfg1Y", "yafg100+ldaz [mm]"]
     )
     #
     if level2:
@@ -269,8 +269,8 @@ def plot_vel_esd_gmt(selected_frame_esds, frameta, mindate, maxdate, level1, lev
         fig = figpart_var(level1, selected_frame_esds, frameta, fig, additrf = (True & showitrf), plotstd = True)
     #
     #print('legend')
-    fig.legend(position="JBL+jBL+o0.1c", box='+gwhite+p1p')
     fig.basemap(frame=True) #["WSen", "af"])
+    fig.legend(position="JBL+jBL+o0.1c", box='+gwhite+p1p')
     #fig.show(dpi=120)
     return fig
 
