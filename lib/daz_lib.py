@@ -426,6 +426,68 @@ def get_itrf_gps_EN(df, samplepoints=3, velnc='vel_gps_kreemer.nc', refto='NNR',
     return df
 
 
+'''
+the below function was used as:
+import lics_unwrap as lu
+outfile = 'test.vNs.csv'
+ve='ve_velmap_linear_tomilan.tif'; se='se_velmap_linear_tomilan.tif'
+ve=lu.load_tif2xr(ve)
+se=lu.load_tif2xr(se)
+framespd['vE_external_EU'] = 0.0
+framespd['stdE_external_EU'] = 0.0
+#framespd['vE_external_NNR'] = 0.0
+velcol = 'slope_daz_mm_final_mmyear'
+framespd[velcol+'_EU'] = 0.0
+framespd['vN_estimate_EU'] = 0.0
+for frame in framespd['frame']:
+    frameta = framespd[framespd.frame==frame].copy()
+    clon, clat = frameta[['center_lon', 'center_lat']].values[0]
+    vE = get_avg_value_in_region(ve, clon, clat, radius_deg = 0.8)
+    framespd['stdE_external_EU'] = get_avg_value_in_region(se, clon, clat, radius_deg = 0.8)
+    frameta['vE_external_EU'] = vE
+    # if needed:
+    # nnr_E, nnr_N = get_ITRF_ENU(clat, clon, model='itrf2014', refto='NNR')
+    pmm_to = float(frameta['slope_plates_vel_azi_itrf2014_eur']) # in alongtrack!!!
+    pmm_from = float(frameta['slope_plates_vel_azi_itrf2014'])
+    veldaz = float(frameta[velcol])
+    veldaz_eu = convert_nnr2eur(veldaz, pmm_from, pmm_to)
+    frameta[velcol+'_EU'] = veldaz_eu
+    # frameta['vE_external_NNR'] = convert_nnr2eur(vE, pmm_from, pmm_to)
+    uE, uN = heading2EN_lookvector(float(frameta['heading']))
+    frameta['vN_estimate_EU'] = extract_dN_from_daz(veldaz_eu, vE, uE, uN)
+    framespd.update(frameta)
+
+# export that to csv,i.e.:
+cols2csv = ['center_lon', 'center_lat', 'vN_estimate_EU', 'daz_mm_final_RMSE_mmy_full', 'vE_external_EU', 'stdE_external_EU']
+selout = framespd[cols2csv]
+selout = selout.rename(columns={cols2csv[0]:'lon', cols2csv[1]:'lat', cols2csv[2]:'vN',
+               cols2csv[3]:'stdN', cols2csv[4]:'vE', cols2csv[5]:'stdE'})
+selout.to_csv(outfile)
+'''
+def get_avg_value_in_region(xrda, clon, clat, radius_deg = 1):
+    ''' extracts xrda values around given point
+    '''
+    if xrda.lat[2]>xrda.lat[1]:
+        sel = xrda.sel(lon=slice(clon-radius_deg, clon+radius_deg), lat = slice(clat-radius_deg, clat+radius_deg))
+    else:
+        sel = xrda.sel(lon=slice(clon-radius_deg, clon+radius_deg), lat = slice(clat+radius_deg, clat-radius_deg))
+    return float(sel.mean())
+
+
+def convert_nnr2eur(velnnr, itrfnnr, itrfeu):
+    ''' Converts velocity in NNR (e.g. decomposed daz) to EU using PMM values (or opposite)
+    '''
+    veleu = velnnr - itrfnnr + itrfeu
+    return veleu
+
+
+def extract_dN_from_daz(daz, vE_external, E, N):
+    ''' Use externally estimated vE to estimate vN from daz
+    '''
+    dN = (daz - vE_external*E)/N
+    return dN
+
+
 def get_std_diff(diff):
     suma = np.sum(diff**2) #diff
     return np.sqrt(suma/len(diff))
