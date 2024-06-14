@@ -222,8 +222,16 @@ def get_vtec_from_code(acqtime, lat = 0, lon = 0, storedir = '/gws/nopw/j04/nceo
     # prep 
     #hhmmss=acqtime.strftime('%H%M%S')
     # loading the TEC maps, thanks to https://notebook.community/daniestevez/jupyter_notebooks/IONEX (but improved towards xarray by ML B-)
-    tecmaps = get_tecmaps(ionix)
-    interval = int(grep1line('INTERVAL',ionix).split()[0])
+    try:
+        tecmaps = get_tecmaps(ionix)
+    except:
+        print('ERROR loading ionix file: '+ionix)
+        return False
+    try:
+        interval = int(grep1line('INTERVAL',ionix).split()[0])
+    except:
+        print('ERROR, the ionix file '+ionix+' does not contain necessary keywords. Cancelling')
+        return False
     timestep = interval/3600
     timecoords = np.arange(0.0,24.0+timestep,timestep)  # we expect start/end time being midnight, should be standard for all CODE files?
     lat_all = np.arange(87.5,-87.5-2.5,-2.5)
@@ -279,7 +287,11 @@ def parse_map(tecmap, exponent = -1):
 
 
 def get_tecmaps(filename):
-    exponent = int(grep1line('EXPONENT',filename).split()[0]) # this is exponent of the data
+    try:
+        exponent = int(grep1line('EXPONENT',filename).split()[0]) # this is exponent of the data
+    except:
+        print('WARNING, exponent not found in '+filename+'. Perhaps the file is corrupted?')
+        exponent = -1
     with open(filename) as f:
         ionex = f.read()
         return [parse_map(t, exponent) for t in ionex.split('START OF TEC MAP')[1:]]
