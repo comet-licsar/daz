@@ -745,7 +745,7 @@ def fix_pod_offset(esds, using_orbits = False):
                 esds.update(ep.subtract(offset_m))
                 continue
             epochs = []
-            epochs = epochs + dazes[dazes['orbfile']==''].epoch.to_list()
+            #epochs = epochs + dazes[dazes['orbfile']==''].epoch.to_list()  # 2024/06 - skipping this as the db is not consistent! Most of the prev POD data were fixed below
             epochsprevfixed = dazes[dazes['orbfile']=='fixed_as_in_GRL'].epoch.to_list()
             epochs = epochs + epochsprevfixed
             if not epochs:
