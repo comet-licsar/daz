@@ -263,7 +263,10 @@ def get_vtec_from_tecxr(tecxr, acqtime, lat, lon, rotate=True):
     #         version 1.1. Paper presented at the Proceedings of the IGS AC workshop, Darmstadt, Germany.
     if rotate:
         # 3D interpolation with rotation as above reference
-        htimes = tecxr.time.values
+        try:
+            htimes = tecxr.time.values
+        except:
+            htimes = np.array([float(tecxr.time)])  #in case of only one value
         pretime = int(htimes[htimes <= time_dec][-1])
         postime = int(htimes[htimes >= time_dec][0])
         #
