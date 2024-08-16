@@ -950,8 +950,10 @@ def plot_daz_frame_licsar(frame, limit = 8000, newold=True):
         toplotB = dazes[dazes['AB']=='B'].set_index('epoch').daz*14000
         toplotA=toplotA[np.abs(toplotA)<limit]
         toplotB=toplotB[np.abs(toplotB)<limit]
-        toplotA.plot(title=frame, ylabel='$u_{az}$ [mm]', marker='o', linestyle='')#-.')
-        toplotB.plot(title=frame, ylabel='$u_{az}$ [mm]', marker='o', linestyle='')#-.')
+        if not toplotA.empty:
+            toplotA.plot(title=frame, ylabel='$u_{az}$ [mm]', marker='o', linestyle='')#-.')
+        if not toplotB.empty:
+            toplotB.plot(title=frame, ylabel='$u_{az}$ [mm]', marker='o', linestyle='')#-.')
     else:
         azioffs=dl.get_azioffs_old_new_POD(frame)
         dazesep=dazes.set_index('epoch')
@@ -964,5 +966,7 @@ def plot_daz_frame_licsar(frame, limit = 8000, newold=True):
         toplotA=toplotA[np.abs(toplotA)<limit]
         toplotB=toplotB[np.abs(toplotB)<limit]
         title='azioff (PODdiff-corrected): '+frame
-        toplotA.plot(title=title, ylabel='$u_{az}$ [mm]', marker='o', linestyle='')#-.')
-        toplotB.plot(title=title, ylabel='$u_{az}$ [mm]', marker='o', linestyle='')#-.')
+        if not toplotA.empty:
+            toplotA.plot(title=title, ylabel='$u_{az}$ [mm]', marker='o', linestyle='')#-.')
+        if not toplotB.empty:
+            toplotB.plot(title=title, ylabel='$u_{az}$ [mm]', marker='o', linestyle='')#-.')
