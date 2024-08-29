@@ -32,7 +32,15 @@ if [ ! -f $in_esds ] || [ ! -f $in_frames ] || [ -f $out_SET ]; then
 fi
 
 j='none'
-i=0; for x in `head -n1 $in_esds | sed 's/\,/ /g'`; do let i=$i+1; if [ `echo $x | cut -c -5` == 'epoch' ]; then j=$i; fi; done
+# checking first the epochtime column:
+getetime=0
+i=0; for x in `head -n1 $in_esds | sed 's/\,/ /g'`; do let i=$i+1; if [ `echo $x | cut -c -5` == 'epochtime' ]; then j=$i; fi; done
+if [ $j == 'none' ]; then
+  # if not, revert to original 'inaccurate' SET estimation
+  i=0; for x in `head -n1 $in_esds | sed 's/\,/ /g'`; do let i=$i+1; if [ `echo $x | cut -c -5` == 'epoch' ]; then j=$i; fi; done
+else
+  getetime=1
+fi
 if [ $j == 'none' ]; then
  echo "ERROR, input file does not contain epoch or epochdate column"
  exit
@@ -47,8 +55,14 @@ for aline in `cat $in_frames | tail -n+2 `; do
      lat=`echo $aline | cut -d ',' -f4`
      masterdate=`echo $aline | cut -d ',' -f2`
      masterdate=`echo ${masterdate:0:4}-${masterdate:4:2}-${masterdate:6:2}`
-     centertime=`echo $aline | cut -d ',' -f9`
-     masterdt=$masterdate"T"$centertime
+     if [ $getetime == 0 ]; then
+       centertime=`echo $aline | cut -d ',' -f9`
+       masterdt=$masterdate"T"$centertime
+     else
+       masterdt=`grep $masterdate $in_esds | cut -d ',' -f $j | sed 's/ /T/'`
+       echo "debug - assuming this as masterdt"
+       echo $masterdt
+     fi
      heading=`echo $aline | cut -d ',' -f5`
      mtide=`gmt earthtide -L$lon/$lat -T$masterdt 2>/dev/null | sed 's/\t/,/g'`
      NM=`echo $mtide | cut -d ',' -f2`
@@ -62,14 +76,18 @@ for aline in `cat $in_frames | tail -n+2 `; do
 
      for eline in `grep ^$frame $in_esds`; do
       #epochdate=`echo $eline | cut -d ',' -f2`
-      epochdate=`echo $eline | cut -d ',' -f$j`
-      if [ `echo $epochdate | grep -c '-'` == 0 ]; then
-        epochdatee=`echo ${epochdate:0:4}-${epochdate:4:2}-${epochdate:6:2}`
+      if [ $getetime == 0 ]; then
+        epochdate=`echo $eline | cut -d ',' -f$j`
+        if [ `echo $epochdate | grep -c '-'` == 0 ]; then
+          epochdatee=`echo ${epochdate:0:4}-${epochdate:4:2}-${epochdate:6:2}`
+        else
+          epochdatee=$epochdate
+          epochdate=`echo $epochdate | sed 's/-//g'`
+        fi
+        epochdt=$epochdatee"T"$centertime
       else
-        epochdatee=$epochdate
-        epochdate=`echo $epochdate | sed 's/-//g'`
+        epochdt=`echo $eline | cut -d ',' -f$j | sed 's/ /T/'`
       fi
-      epochdt=$epochdatee"T"$centertime
       etide=`gmt earthtide -L$lon/$lat -T$epochdt 2>/dev/null | sed 's/\t/,/g'`
       NE=`echo $etide | cut -d ',' -f2`
       EE=`echo $etide | cut -d ',' -f3`
