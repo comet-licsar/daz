@@ -74,7 +74,7 @@ for aline in `cat $in_frames | tail -n+2 `; do
      VM=$(printf "%.12f" "$VM")
 
 
-     for eline in `grep ^$frame $in_esds`; do
+     for eline in `grep ^$frame $in_esds | sed 's/ /T/'`; do
       #epochdate=`echo $eline | cut -d ',' -f2`
       if [ $getetime == 0 ]; then
         epochdate=`echo $eline | cut -d ',' -f$j`
