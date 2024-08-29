@@ -40,6 +40,8 @@ def load_csvs(esdscsv = 'esds.csv', framescsv = 'frames.csv', core_init = False)
     if 'epoch' in esds.columns:
         esds = esds.drop('epoch', axis=1)
     esds['epochdate'] = esds.apply(lambda x : pd.to_datetime(str(x.epochdate)).date(), axis=1)
+    if 'epochtime' in esds.columns:
+        esds['epochtime'] = esds.apply(lambda x: pd.to_datetime(str(x.epochtime)), axis=1)
     if core_init:
         mindate = esds['epochdate'].min()
         #maxdate = esds['epochdate'].max()
