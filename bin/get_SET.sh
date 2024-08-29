@@ -34,7 +34,7 @@ fi
 j='none'
 # checking first the epochtime column:
 getetime=0
-i=0; for x in `head -n1 $in_esds | sed 's/\,/ /g'`; do let i=$i+1; if [ `echo $x | cut -c -5` == 'epochtime' ]; then j=$i; fi; done
+i=0; for x in `head -n1 $in_esds | sed 's/\,/ /g'`; do let i=$i+1; if [ $x == 'epochtime' ]; then j=$i; fi; done
 if [ $j == 'none' ]; then
   # if not, revert to original 'inaccurate' SET estimation
   i=0; for x in `head -n1 $in_esds | sed 's/\,/ /g'`; do let i=$i+1; if [ `echo $x | cut -c -5` == 'epoch' ]; then j=$i; fi; done
