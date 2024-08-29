@@ -55,14 +55,14 @@ for aline in `cat $in_frames | tail -n+2 `; do
      lat=`echo $aline | cut -d ',' -f4`
      masterdate=`echo $aline | cut -d ',' -f2`
      masterdate=`echo ${masterdate:0:4}-${masterdate:4:2}-${masterdate:6:2}`
-     if [ $getetime == 0 ]; then
-       centertime=`echo $aline | cut -d ',' -f9`
-       masterdt=$masterdate"T"$centertime
-     else
-       masterdt=`grep $masterdate $in_esds | cut -d ',' -f $j | sed 's/ /T/'`
-       echo "debug - assuming this as masterdt"
-       echo $masterdt
-     fi
+     #if [ $getetime == 0 ]; then
+     centertime=`echo $aline | cut -d ',' -f9`
+     masterdt=$masterdate"T"$centertime
+     #else
+     #  masterdt=`grep $masterdate $in_esds | cut -d ',' -f $j | sed 's/ /T/'`
+     #  echo "debug - assuming this as masterdt"
+     #  echo $masterdt
+     #fi
      heading=`echo $aline | cut -d ',' -f5`
      mtide=`gmt earthtide -L$lon/$lat -T$masterdt 2>/dev/null | sed 's/\t/,/g'`
      NM=`echo $mtide | cut -d ',' -f2`
