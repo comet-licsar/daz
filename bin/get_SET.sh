@@ -86,6 +86,7 @@ for aline in `cat $in_frames | tail -n+2 `; do
         fi
         epochdt=$epochdatee"T"$centertime
       else
+        epochdate=`echo $eline | cut -d ',' -f$j | cut -d ' ' -f 1`
         epochdt=`echo $eline | cut -d ',' -f$j | sed 's/ /T/'`
       fi
       etide=`gmt earthtide -L$lon/$lat -T$epochdt 2>/dev/null | sed 's/\t/,/g'`
