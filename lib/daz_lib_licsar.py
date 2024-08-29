@@ -15,19 +15,31 @@ except:
 from daz_lib import *
 
 
-def extract_all2txt(outfr = 'frames.txt', outdaz = 'esds.txt'):
+def extract_all2txt(outfr = 'frames.txt', outdaz = 'esds.txt', inframelist = None, fix_epoch_time = False):
     """ Main function to extract all frame and daz data from the LiCSAR database.
+
+    If inframelist is None, it will import all existing (initialised) frames. Otherwise you can just add a list of frames, e.g.
+    inframelist = ['117A_04827_031113']
     """
-    frames = create_framelist(outfr)
-    extract2txt_esds_all_frames(framelist = frames, outfile=outdaz)
+    frames = create_framelist(outfile = outfr, inframelist = inframelist)
+    extract2txt_esds_all_frames(framelist = frames, outfile=outdaz, fix_epoch_time = fix_epoch_time)
     print('done, please continue by daz_01_prepare_inputs.py')
 
 
-def create_framelist(outfile='frames.txt'):
+def create_framelist(outfile='frames.txt', inframelist = None):
     """ Creates frames.txt for all frames in LiCSInfo that contains table in:
     frame,master,center_lon,center_lat
+
+    If inframelist is None, it will import all existing (initialised) frames. Otherwise you can just add a list of frames, e.g.
+    inframelist = ['117A_04827_031113']
     """
-    framespd = fc.get_all_frames(only_initialised = True, merge = True)
+    if type(inframelist) == type(None):
+        print('ingesting all frames')
+        framespd = fc.get_all_frames(only_initialised = True, merge = True)
+    else:
+        print('acquiring selected frames info')
+        for fr in inframelist:
+            framespd = fc.get_frames_gpd(inframelist)
     # get lons,lats:
     c=framespd.geometry.centroid
     lons = []
@@ -63,11 +75,11 @@ for tr in `seq 1 175`; do for f in `ls $tr`; do
 done;done
 '''
 
-def extract2txt_esds_all_frames(framelist, outfile='esds.txt'):
+def extract2txt_esds_all_frames(framelist, outfile='esds.txt', fix_epoch_time = False):
     dazes=pd.DataFrame()
     for frame in framelist:
         try:
-            a=extract2txt_esds_frame(frame)
+            a=extract2txt_esds_frame(frame, fix_epoch_time = fix_epoch_time)
             dazes=dazes.append(a)
         except:
             print('frame '+frame+' is empty')
@@ -75,11 +87,13 @@ def extract2txt_esds_all_frames(framelist, outfile='esds.txt'):
     dazes.to_csv(outfile, index=False)
 
 
-def extract2txt_esds_frame(frame):
+def extract2txt_esds_frame(frame, fix_epoch_time = False):
     '''
     extracts to esds txt full data for given frame, from database
     the resultant txt file is a csv as:
     frame,esd_master,epoch,daz_total_wrt_orbits,daz_cc_wrt_orbits,orbits_precision,version
+
+    or with epochtime as well, if this was set by fix_epoch_time (takes long...)
     '''
     a = get_daz_frame(frame)
     a['epoch']=a.epoch.apply(lambda x: x.strftime('%Y%m%d'))
@@ -89,7 +103,11 @@ def extract2txt_esds_frame(frame):
     a['version'] = 'm' # i forgot what this is for, but should be ok any letter (?)
     a['frame'] = frame
     a=a.rename(columns={'cc_azi':'daz_cc_wrt_orbits'})
-    return a[['frame','esd_master','epoch','daz_total_wrt_orbits','daz_cc_wrt_orbits','orbits_precision','version']]
+    cols = ['frame','esd_master','epoch','daz_total_wrt_orbits','daz_cc_wrt_orbits','orbits_precision','version']
+    if fix_epoch_time:
+        bperp, a['epochtime'] = fc.estimate_bperps(frame, list(a.epoch.values), return_epochsdt = True)
+        cols = cols + ['epochtime']
+    return a[cols]
 
 
 def get_daz_frame(frame):
