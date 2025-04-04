@@ -11,7 +11,12 @@ except:
 
 #for iono correction
 import nvector as nv
-import iri2016
+try:
+    import iri2016
+except:
+    print('WARNING: iri2016 not found - please use only CODE corrections and set constant alpha')
+
+
 import pyproj
 import numpy as np
 import re
