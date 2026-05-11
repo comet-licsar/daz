@@ -260,7 +260,8 @@ def download_code_data(acqtime, storedir = '/gws/ssde/j25a/nceo_geohazards/vol1/
     return ionix
 
 
-def get_vtec_from_code(acqtime, lat = 0, lon = 0, storedir = '/gws/ssde/j25a/nceo_geohazards/vol1/code_iono', return_fullxr = False, noJPL=False, printout=True):
+def get_vtec_from_code(acqtime, lat = 0, lon = 0,
+                       storedir = '/gws/ssde/j25a/nceo_geohazards/vol1/code_iono', return_fullxr = False, noJPL=False, printout=True):
     """ Adapted from Reza Bordbari script, plus using functions from https://notebook.community/daniestevez/jupyter_notebooks/IONEX
     
     17/03/2025-(MN):function also helps to extract NASA JPL High Resolution vTEC values (15min, 1x1degree) at first. 
@@ -350,10 +351,10 @@ def get_vtec_from_code(acqtime, lat = 0, lon = 0, storedir = '/gws/ssde/j25a/nce
         tecxr = tecxr*1e+16 # from TECU
     if acqtime<tecxr.time.min():
         # need to join day before:
-        tecxr2=get_vtec_from_code(acqtime-pd.Timedelta('1 day'), lat=lat, lon=lon, return_fullxr = True)
+        tecxr2=get_vtec_from_code(acqtime-pd.Timedelta('4 hours'), lat=lat, lon=lon, return_fullxr = True)
         tecxr = xr.concat([tecxr2, tecxr], dim='time')
     if acqtime>tecxr.time.max():
-        tecxr2=get_vtec_from_code(acqtime+pd.Timedelta('1 day'), lat=lat, lon=lon, return_fullxr = True)
+        tecxr2=get_vtec_from_code(acqtime+pd.Timedelta('4 hours'), lat=lat, lon=lon, return_fullxr = True)
         tecxr = xr.concat([tecxr, tecxr2], dim='time')
     if return_fullxr:
         return tecxr
