@@ -154,6 +154,72 @@ def get_platemotion_en(df, collon = 'centroid_lon', collat = 'centroid_lat', out
     return df
 
 
+def estimate_vels_frame(frame, tocsvs = True):
+    ''' this will perform full processing... if frame.csv is present in the folder, it will load that one instead of full regen'''
+    csvfile = frame+'.csv'
+    if os.path.exists(csvfile):
+        esds = pd.read_csv(csvfile)
+        try:
+            esds = esds.drop('Unnamed: 0', axis=1)
+        except:
+            pass
+    else:
+        esds=get_daz_frame(frame, fulloutput=True, include_corrections=True)
+    esds = esds[esds['cc_range']!=0] # really needed?
+    esds = esds[esds['daz'] != 0]  # really needed?
+    esds['epochdate'] = esds['epoch'].copy(deep=True)
+    esds = esds.drop('epoch', axis=1)
+    esds['epochdate'] = esds.apply(lambda x : pd.to_datetime(str(x.epochdate)).date(), axis=1)
+    esds = esds[esds['epochdate'] > dt.date(2016,3,1)]
+    esds['years_since_beginning'] = 0.0
+    firstdatei = esds['epochdate'].min()
+    esds['years_since_beginning'] = esds['epochdate'] - firstdatei
+    esds['years_since_beginning'] = esds['years_since_beginning'].apply(lambda x: float(x.days)/365.25)
+    frameta=get_frameta(frame)
+    esds['drg_mm_notide_noiono_nogacos']=esds['cc_range']*float(frameta['range_resolution']*1000) - esds['drg_SET_mm'] - esds['drg_iono_mm'] - esds['drg_GACOS_mm']
+    esds['daz_mm_notide_noiono']=(esds['daz']-esds['daz_iono']-esds['daz_SET'])*float(frameta['azimuth_resolution']*1000)
+    mdate=pd.Timestamp(frameta.master.values[0])
+    esds['S1AorB'] = flag_s1b(esds.epochdate.values, mdate, 'A', True)
+    import daz_timeseries as dts
+    esds['drg_final_mm'] = esds['drg_mm_notide_noiono_nogacos'].copy(deep=True)
+    esds['daz_final_mm'] = esds['daz_mm_notide_noiono'].copy(deep=True)
+    esdsB = esds[esds['S1AorB']=='B']
+    v,c,stderr,c_AB = dts.estimate_s1ab(esds, col = 'daz_mm_notide_noiono', rmsiter = 50, printout = True)
+    frameta['vel_az_mmy'] = [v]
+    frameta['intercept_az'] = [c]
+    frameta['vel_az_stderr_mmy'] = [stderr]
+    frameta['S1AB_offset_az'] = [c_AB]
+    esdsB['daz_final_mm'] = esdsB['daz_final_mm'] - c_AB
+    #
+    v,c,stderr,c_AB = dts.estimate_s1ab(esds, col = 'drg_mm_notide_noiono_nogacos', rmsiter = 50, printout = True)
+    frameta['vel_rg_mmy'] = [v]
+    frameta['intercept_rg'] = [c]
+    frameta['vel_rg_stderr_mmy'] = [stderr]
+    frameta['S1AB_offset_rg'] = [c_AB]
+    esdsB['drg_final_mm'] = esdsB['drg_final_mm'] - c_AB
+    esds.update(esdsB)
+    # finally re-estimate vels
+    selesds = esds[np.abs(esds['daz_final_mm']-esds['daz_final_mm'].median())<400]
+    x = selesds.years_since_beginning.values  # .transpose()
+    X = np.array([x]).transpose()
+    y = selesds['daz_final_mm'].values
+    huber = HuberRegressor(alpha = 1, epsilon = 1.35)
+    huber.fit(X, y)
+    frameta['vel_az_mmy_huber'] = [huber.coef_[0]]
+    #
+    selesds = esds[np.abs(esds['drg_final_mm'] - esds['drg_final_mm'].median()) < 400]
+    x = selesds.years_since_beginning.values #.transpose()
+    X = np.array([x]).transpose()
+    y = selesds['drg_final_mm'].values
+    huber = HuberRegressor(alpha=1, epsilon=1.35)
+    huber.fit(X, y)
+    frameta['vel_rg_mmy_huber'] = [huber.coef_[0]]
+    if tocsvs:
+        esds.to_csv(frame+'.esds.csv')
+        frameta.to_csv(frame+'.vels.csv')
+    return esds, frameta
+
+
 def get_daz_frame(frame, fulloutput = True, include_corrections = False, use_iri_hei = False, corr_per_swath = True,
                   datemin=dt.date(2014,10,1), datemax=dt.date.today()):
     ''' Function to extract all frame daz values from the LiCSInfo database.
@@ -455,9 +521,11 @@ def get_frameta(frame, perswath=False):
     heading = float(grep1line('heading', metafile).split('=')[1])
     try:
         azimuth_resolution = float(grep1line('azimuth_resolution', metafile).split('=')[1])
+        range_resolution = float(grep1line('range_resolution', metafile).split('=')[1])
     except:
-        print('WARNING, no azi res info in metafile '+metafile)
+        print('WARNING, no resolution info in metafile '+metafile+' - using defaults')
         azimuth_resolution = 14.0 #m
+        range_resolution = 2.3
     avg_incidence_angle = float(grep1line('avg_incidence_angle', metafile).split('=')[1])
     try:
         centre_range_m = float(grep1line('centre_range_ok_m', metafile).split('=')[1])
@@ -470,6 +538,7 @@ def get_frameta(frame, perswath=False):
     lat = c[0].coords[0][1]
     a['heading'] = [heading]
     a['azimuth_resolution'] = [azimuth_resolution]
+    a['range_resolution'] = [range_resolution]
     a['avg_incidence_angle'] = [avg_incidence_angle]
     a['centre_range_m'] = [centre_range_m]
     a['centre_time'] = [centre_time]

@@ -115,8 +115,14 @@ def main(argv=None):
         print('Applying S1AB corrections (only to daz_mm_notide_noiono and stored as daz_mm_final)')
         esds['daz_mm_final'] = esds['daz_mm_notide_noiono'].copy()
         esds, framespd = correct_s1ab(esds, framespd, cols=['daz_mm_final'])
+        if 'drg_mm_notide_noiono_nogacos' in esds:
+            print('Adding also to the final drg')
+            framespd = estimate_s1ab_allframes(esds, framespd, col='drg_mm_notide_noiono_nogacos', rmsiter=50, outcol = 'S1AB_offset_rg')
+            esds['drg_mm_final'] = esds['drg_mm_notide_noiono_nogacos'].copy()
+            esds, framespd = correct_s1ab(esds, framespd, cols=['drg_mm_final'], corrcol = 'S1AB_offset_rg')
     # 2021-10-12: the original way:
-    for col in ['daz_mm', 'daz_mm_notide', 'daz_mm_notide_noiono_grad', 'daz_mm_notide_noiono_iri', 'daz_mm_notide_noiono','daz_mm_final']:
+    for col in ['daz_mm', 'daz_mm_notide', 'daz_mm_notide_noiono_grad', 'daz_mm_notide_noiono_iri', 'daz_mm_notide_noiono',
+                'daz_mm_final', 'drg_mm_final', 'drg_mm_notide_noiono_nogacos', 'drg_mm_notide_noiono']:
         if col in esds:
             print('estimating velocities of '+col)
             esds, framespd = df_calculate_slopes(esds, framespd, alpha = 1, eps = 1.35, bycol = col, subset = subset, roll_assist = roll_assist)
