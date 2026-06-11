@@ -20,6 +20,7 @@ import pandas as pd
 import numpy as np
 import xarray as xr
 import glob, os
+import matplotlib.pyplot as plt
 
 # 2024 changing to pygmt from hv
 import pygmt
@@ -1234,3 +1235,96 @@ def create_article_fig(deccsv = '/gws/ssde/j25a/nceo_geohazards/vol1/public/shar
     print('difference in N: {0} $\pm$ {1}'.format(str(mean_diff_N), str(2 * err_N)))
     print(outpng)
     return fig
+
+
+# FRINGE 2026
+# plot rg/az TS plots:
+# first azi:
+def load_daz_csv_frame(csvfile):
+    """ to load the dazdrg csv per frame, e.g. as in
+    /gws/ssde/j25a/nceo_geohazards/vol2/LiCS/temp/insar_proc/earmla/fringe.2026/daz_drg/201603-2026/021D_05765_131313.esds.csv
+
+    """
+    esds = pd.read_csv(csvfile)
+    esds['epochdate'] = esds.apply(lambda x : pd.to_datetime(str(x.epochdate)).date(), axis=1)
+    esds=esds.set_index(esds['epochdate'])
+    esds=esds.sort_index()
+    return esds
+
+
+#import matplotlib.dates as mdates
+#from datetime import datetime, timedelta
+'''
+# def plot_ts_plot
+frames = ['021D_05765_131313','021D_05965_131313',
+          '087A_05786_051311','087A_05958_131313']
+
+for frame in frames:
+    print(frame)
+    csvfile = frame+'.esds.csv'
+    esds = load_daz_csv_frame(csvfile)
+    esds['daz_mm'] = esds['daz']*14000
+    #if frame == '087A_05958_131313':
+    #    # wrong pod fix! need fix the fix:
+    #    selesd = esds[esds.epochdate>dt.date(2020,7,30)]
+    #    selesd['daz_final_mm'] +=39
+    #    selesd['daz_mm'] +=39
+    #    esds.update(selesd)
+    esds['drg_mm'] = esds['cc_range']*2300
+    # esds['drg_final_mm'] = esds['cc_range'] * 2300
+    fig, ax = fringe_plot_frame(esds, frame, ptype = 'daz')
+    plt.show()
+    fig, ax = fringe_plot_frame(esds, frame, ptype = 'drg')
+    plt.show()
+
+'''
+def fringe_plot_frame(esds, frame, ptype = 'daz'):
+    toplotA = esds[esds['S1AorB']=='A'] #.set_index('epoch').daz*14000
+    toplotB = esds[esds['S1AorB']=='B']
+    if (toplotB.epochdate > dt.date(2022,1,1)).max():
+        print('warning, S1A and S1B are switched for frame '+frame)
+        toplotA = esds[esds['S1AorB'] == 'B']
+        toplotB = esds[esds['S1AorB'] == 'A']
+    cols = [ptype+'_mm'] # , 'daz_final_mm']
+    if ptype == 'drg':
+        labels = ['$u_{rg}$ (S1A, S1B)']
+        miny, maxy = -800, 800
+        if frame[3] == 'A':
+            miny += 300
+            maxy += 300
+    else:
+        labels = ['$u_{az}$ (S1A, S1B)'] #, '$u_{az}-SET-iono-off_{S1AB}$']
+        miny, maxy = -300, 300
+    markers = ['*', 'o']
+    # colours = ['lightblue','green']
+    linestyles = ['','']
+    fig, ax = plt.subplots(figsize=(8, 4))
+    legendhand = []
+    for i in range(len(cols)):
+        col = cols[i]
+        toplotA[col].plot(ax=ax, title=frame, label='_nolegend_', color='#1f77b4', marker=markers[i], linestyle=linestyles[i])#-.')
+        # ll = ax.get_lines()[-1:]
+        toplotB[col].plot(ax=ax,title=frame, label='_nolegend_', color='#ff7f0e', marker=markers[i], linestyle=linestyles[i])
+        ll, ll2 = ax.get_lines()[-2:]
+        legendhand.append((ll,ll2))
+    #
+    # below put model incl S1AB
+    if cols[0] == 'daz_mm':
+        col = 'daz_final_mm'
+        label='$u_{az}-SET-iono-off_{S1AB}$'
+    else:
+        col = 'drg_final_mm'
+        label = '$u_{rg}-SET-tropo-iono-off_{S1AB}$'
+    labels.append(label)
+    esds[col].plot(title=frame, label='_nolegend_', color = 'green', marker='o', linestyle='')
+    ll2 = ax.get_lines()[-1]
+    legendhand.append(ll2)
+    ax.set_xlim(dt.datetime(2016,1,1), dt.datetime(2025,1,1))  # datetime bounds
+    ax.set_ylim(miny, maxy)
+    ax.set_ylabel('mm')
+    ax.set_xlabel('date')
+    ax.grid(True)
+    from matplotlib.legend_handler import HandlerTuple
+    ax.legend(legendhand, labels, handler_map={tuple: HandlerTuple(ndivide=2)}, handlelength=1.5)
+    return fig, ax
+
