@@ -12,7 +12,8 @@ def get_rmse(y, y_pred, ddof=2):
 
 
 ### S1AB offset calculation:
-def estimate_s1ab(frame_esds, col = 'daz_mm_notide_noiono', rmsiter = 50, printout = True):
+def estimate_s1ab(frame_esds, col = 'daz_mm_notide_noiono', rmsiter = 50, printout = True,
+                  add_pod_offset = False):
     #epochdates = frame_esds['epochdate'].values
     isB = (frame_esds.S1AorB == 'B').values * 1
     if (np.sum(isB) < 20 and len(isB[isB == 0]) < 20) or (np.sum(isB) < 10):
@@ -20,7 +21,11 @@ def estimate_s1ab(frame_esds, col = 'daz_mm_notide_noiono', rmsiter = 50, printo
         # print('cancelling for cAB')
     years = frame_esds.years_since_beginning.values
     dazes = frame_esds[col].values
-    A = np.vstack((years,np.ones_like(years),isB)).T
+    if add_pod_offset:
+        pod_before = (frame_esds.epochdate < dt.date(2020, 7, 31)).values * 1
+        A = np.vstack((years, np.ones_like(years), isB, pod_before)).T
+    else:
+        A = np.vstack((years,np.ones_like(years),isB)).T
     #res = model_filter(A, dazes, iters=rmsiter,years_to_pod=years_to_pod)
     res = model_filter_v2(A, dazes, iters=rmsiter, target_rmse = 30, printout = printout)
     model=res[0]
@@ -29,7 +34,11 @@ def estimate_s1ab(frame_esds, col = 'daz_mm_notide_noiono', rmsiter = 50, printo
     c = model[1]
     c_AB = model[2]
     # now what to return:
-    return v,c,stderr,c_AB
+    if add_pod_offset:
+        pod_offset = model[3]
+        return v, c, stderr, c_AB, pod_offset
+    else:
+        return v,c,stderr,c_AB
 
 
 # for range, e.g.:

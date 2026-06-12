@@ -1259,17 +1259,34 @@ def load_daz_csv_frame(csvfile):
 frames = ['021D_05765_131313','021D_05965_131313',
           '087A_05786_051311','087A_05958_131313']
 
+# estim --- MANUAL!!! I REALISED WE HAVE WRONG POD ERR IN OLD ORBS
+for frame in frames:
+    print(frame)
+    csvfile = frame+'.esds.csv'
+    esds = load_daz_csv_frame(csvfile)
+    v, c, stderr, c_AB, pod_offset = estimate_s1ab2(esds, col = 'daz_final_mm', rmsiter = 50, printout = True,
+                  add_pod_offset = True)
+    print(v)
+    print(stderr*2)
+    print(pod_offset)
+    print('---')
+
 for frame in frames:
     print(frame)
     csvfile = frame+'.esds.csv'
     esds = load_daz_csv_frame(csvfile)
     esds['daz_mm'] = esds['daz']*14000
-    #if frame == '087A_05958_131313':
-    #    # wrong pod fix! need fix the fix:
-    #    selesd = esds[esds.epochdate>dt.date(2020,7,30)]
-    #    selesd['daz_final_mm'] +=39
-    #    selesd['daz_mm'] +=39
-    #    esds.update(selesd)
+    if frame == '087A_05958_131313':
+        # wrong pod fix! need fix the fix:
+        selesd = esds[esds.epochdate>dt.date(2020,7,30)]
+        selesd['daz_final_mm'] +=39
+        selesd['daz_mm'] +=39
+        esds.update(selesd)
+    elif frame == '021D_05765_131313':
+        selesd = esds[esds.epochdate>dt.date(2020,7,30)]
+        selesd['daz_final_mm'] +=31
+        selesd['daz_mm'] +=31
+        esds.update(selesd)
     esds['drg_mm'] = esds['cc_range']*2300
     # esds['drg_final_mm'] = esds['cc_range'] * 2300
     fig, ax = fringe_plot_frame(esds, frame, ptype = 'daz')
