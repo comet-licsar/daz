@@ -985,7 +985,19 @@ def plot_daz_frame_licsar(frame, limit = 8000, newold=True):
 
 
 def create_article_fig(deccsv = '/gws/ssde/j25a/nceo_geohazards/vol1/public/shared/temp/earmla/esds.202512/decomposed.ok.ok.weeded.225.csv',
-                       region=[25, 113, 22, 45], strTI='dazdrg', to_eu = False, dpi=120):
+                       region=[25, 113, 22, 45], strTI='dazdrg', to_eu = False, dpi=120, use_AHB = True):
+    region = [25, 113, 22, 45]
+    strTI = 'dazdrg'
+    to_eu = True
+    dpi = 120
+    use_AHB = True
+    plot_resids_only = True
+    deccsv = '/gws/ssde/j25a/nceo_geohazards/vol1/public/shared/temp/earmla/esds.202512/decomposed.ok.ok.weeded.225.csv'
+    if use_AHB:
+        print('using AHB EN outputs -> setting to Eurasia-fixed')
+        to_eu = True
+    #
+    from daz_plotting import *
     import pandas as pd
     import pyproj
     pyproj.datadir.set_data_dir('/gws/smf/j04/nceo_geohazards/software/mambalics/share/proj')
@@ -1034,22 +1046,51 @@ def create_article_fig(deccsv = '/gws/ssde/j25a/nceo_geohazards/vol1/public/shar
     numlns = len(dec)
     # prefilt
     dec = dec[abs(dec['VEL_E']) < 120]
-    dec = dec[dec['RMSE_VEL_E'] < 25]
+    dec = dec[dec['RMSE_VEL_E'] < 5]
     # dec = dec[dec['RMSE_VEL_E'] < 15]
     print('Kept ' + str(len(dec)) + '/' + str(numlns) + ' decomposed cells')
     #
-    if 'GPS_E' in dec.columns:
-        secstr = 'GPS'
-        dec['sec_E'] = dec['GPS_E']
-        dec['sec_N'] = dec['GPS_N']
+    if use_AHB:
+        import lics_processing as lp
+        Nfile = os.path.join(os.environ['LiCSAR_procdir'], 'GIS',  'AHB_outifs', 'Vn.tif')
+        Efile = os.path.join(os.environ['LiCSAR_procdir'], 'GIS',  'AHB_outifs', 've_AHB_final.tif')
+        N = lp.load_tif2xr(Nfile)
+        E = lp.load_tif2xr(Efile)
+        Narr,Nstdarr = [], []
+        Earr, Estdarr = [], []
+        celldia = 225 / 111.111 # deg --  this is resolution of cell
+        for i, r in dec.iterrows():
+            lon, lat = r['centroid_lon'], r['centroid_lat']
+            valN = float(N.sel(lon=slice(lon - celldia / 2, lon + celldia / 2), lat=slice(lat + celldia / 2, lat - celldia / 2)).mean())
+            valNstd = float(N.sel(lon=slice(lon - celldia / 2, lon + celldia / 2), lat=slice(lat + celldia / 2, lat - celldia / 2)).std())
+            valE = float(E.sel(lon=slice(lon - celldia / 2, lon + celldia / 2),
+                         lat=slice(lat + celldia / 2, lat - celldia / 2)).mean())
+            valEstd = float(E.sel(lon=slice(lon - celldia / 2, lon + celldia / 2),
+                            lat=slice(lat + celldia / 2, lat - celldia / 2)).std())
+            Narr.append(valN)
+            Nstdarr.append(valNstd)
+            Earr.append(valE)
+            Estdarr.append(valEstd)
+        dec['AHB_N'] = Narr
+        dec['AHB_E'] = Earr
+        dec['AHB_N_std'] = Nstdarr
+        dec['AHB_E_std'] = Estdarr
+        dec['sec_E'] = dec['AHB_E']
+        dec['sec_N'] = dec['AHB_N']
+        secstr = 'AHB'
     else:
-        secstr = 'ITRF'
-        dec['sec_E'] = dec['ITRF_E']
-        dec['sec_N'] = dec['ITRF_N']
-    #
-    if to_eu:
-        dec['sec_E'] = dec['sec_E'] - dec['eur_E']
-        dec['sec_N'] = dec['sec_N'] - dec['eur_N']
+        if 'GPS_E' in dec.columns:
+            secstr = 'GPS'
+            dec['sec_E'] = dec['GPS_E']
+            dec['sec_N'] = dec['GPS_N']
+        else:
+            secstr = 'ITRF'
+            dec['sec_E'] = dec['ITRF_E']
+            dec['sec_N'] = dec['ITRF_N']
+        #
+        if to_eu:
+            dec['sec_E'] = dec['sec_E'] - dec['eur_E']
+            dec['sec_N'] = dec['sec_N'] - dec['eur_N']
     #
     median_diff_E = (dec['VEL_E'] - dec['sec_E']).median()
     median_diff_N = (dec['VEL_N'] - dec['sec_N']).median()
@@ -1059,51 +1100,91 @@ def create_article_fig(deccsv = '/gws/ssde/j25a/nceo_geohazards/vol1/public/shar
     median_diff_E = 0
     median_diff_N = 0
     #
-    df = pd.DataFrame(
-        data={
-            "x": dec.centroid_lon.values,
-            "y": dec.centroid_lat.values,
-            "east_velocity": dec.VEL_E.values,  # [0, 3, 4, 6, -6, 6],
-            "north_velocity": dec.VEL_N.values,  # [0, 3, 6, 4, 4, -4],
-            "east_sigma": np.zeros_like(dec.centroid_lon.values),  # [4, 0, 4, 6, 6, 6],
-            "north_sigma": np.zeros_like(dec.centroid_lon.values),  # [6, 0, 6, 4, 4, 4],
-            "correlation_EN": np.zeros_like(dec.centroid_lon.values),  # [0.5, 0.5, 0.5, 0.5, -0.5, -0.5],
-            "SITE": dec.index.values,  # ["0x0", "3x3", "4x6", "6x4", "-6x4", "6x-4"],
-        }
-    )
-    #
-    df_unc = pd.DataFrame(
-        data={
-            "x": dec.centroid_lon.values,
-            "y": dec.centroid_lat.values,
-            "east_velocity": dec.VEL_E.values,  # [0, 3, 4, 6, -6, 6],
-            "north_velocity": dec.VEL_N.values,  # [0, 3, 6, 4, 4, -4],
-            "east_sigma": 2 * dec.RMSE_VEL_E.values,  # [4, 0, 4, 6, 6, 6],
-            "north_sigma": 2 * dec.RMSE_VEL_N.values,  # [6, 0, 6, 4, 4, 4],
-            "correlation_EN": np.zeros_like(dec.centroid_lon.values),  # [0.5, 0.5, 0.5, 0.5, -0.5, -0.5],
-            "SITE": dec.index.values,  # ["0x0", "3x3", "4x6", "6x4", "-6x4", "6x-4"],
-        }
-    )
-    #
-    # print('WARNING, exchanged ITRF to GPS velocities only')
-    df_sec = pd.DataFrame(
-        data={
-            "x": dec.centroid_lon.values,
-            "y": dec.centroid_lat.values,
-            "east_velocity": dec.sec_E,  # dec.ITRF_E.values, # [0, 3, 4, 6, -6, 6],
-            "north_velocity": dec.sec_N,  # dec.ITRF_N.values, # [0, 3, 6, 4, 4, -4],
-            "east_sigma": np.zeros_like(dec.centroid_lon.values),
-            "north_sigma": np.zeros_like(dec.centroid_lon.values),
-            "correlation_EN": np.zeros_like(dec.centroid_lon.values),  # [0.5, 0.5, 0.5, 0.5, -0.5, -0.5],
-            "SITE": dec.index.values,  # ["0x0", "3x3", "4x6", "6x4", "-6x4", "6x-4"],
-        }
-    )
+    scaling = 3  # means 1 cm will be plotted like 5 cm
+    if plot_resids_only:
+        velE4df = (dec['VEL_E'] - dec['sec_E']).values
+        velN4df = (dec['VEL_N'] - dec['sec_N']).values
+        dec['resid_E'] = velE4df
+        dec['resid_N'] = velN4df
+        prelen= len(dec)
+        dec = dec[np.abs(dec['resid_N']) < 15]
+        dec = dec[np.abs(dec['resid_E']) < 15]
+        postlen = len(dec)
+        print('Removed '+str(prelen-postlen)+' points with too high residuals.')
+        df = pd.DataFrame(
+            data={
+                "x": dec.centroid_lon.values,
+                "y": dec.centroid_lat.values,
+                "east_velocity": dec['resid_E'].values * scaling,  # [0, 3, 4, 6, -6, 6],
+                "north_velocity": dec['resid_N'].values * scaling,  # [0, 3, 6, 4, 4, -4],
+                "east_sigma": np.zeros_like(dec.centroid_lon.values),  # [4, 0, 4, 6, 6, 6],
+                "north_sigma": np.zeros_like(dec.centroid_lon.values),  # [6, 0, 6, 4, 4, 4],
+                "correlation_EN": np.zeros_like(dec.centroid_lon.values),  # [0.5, 0.5, 0.5, 0.5, -0.5, -0.5],
+                "SITE": dec.index.values,  # ["0x0", "3x3", "4x6", "6x4", "-6x4", "6x-4"],
+            }
+        )
+        #
+        df_unc = pd.DataFrame(
+            data={
+                "x": dec.centroid_lon.values,
+                "y": dec.centroid_lat.values,
+                "east_velocity": dec['resid_E'].values * scaling,  # [0, 3, 4, 6, -6, 6],
+                "north_velocity": dec['resid_N'].values * scaling,  # [0, 3, 6, 4, 4, -4],
+                "east_sigma": dec.RMSE_VEL_E.values * scaling,  # [4, 0, 4, 6, 6, 6],
+                "north_sigma": dec.RMSE_VEL_N.values * scaling,  # [6, 0, 6, 4, 4, 4],
+                "correlation_EN": np.zeros_like(dec.centroid_lon.values),  # [0.5, 0.5, 0.5, 0.5, -0.5, -0.5],
+                "SITE": dec.index.values,  # ["0x0", "3x3", "4x6", "6x4", "-6x4", "6x-4"],
+            }
+        )
+    else:
+        df = pd.DataFrame(
+            data={
+                "x": dec.centroid_lon.values,
+                "y": dec.centroid_lat.values,
+                "east_velocity": dec.VEL_E.values,  # [0, 3, 4, 6, -6, 6],
+                "north_velocity": dec.VEL_N.values,  # [0, 3, 6, 4, 4, -4],
+                "east_sigma": np.zeros_like(dec.centroid_lon.values),  # [4, 0, 4, 6, 6, 6],
+                "north_sigma": np.zeros_like(dec.centroid_lon.values),  # [6, 0, 6, 4, 4, 4],
+                "correlation_EN": np.zeros_like(dec.centroid_lon.values),  # [0.5, 0.5, 0.5, 0.5, -0.5, -0.5],
+                "SITE": dec.index.values,  # ["0x0", "3x3", "4x6", "6x4", "-6x4", "6x-4"],
+            }
+        )
+        #
+        df_unc = pd.DataFrame(
+            data={
+                "x": dec.centroid_lon.values,
+                "y": dec.centroid_lat.values,
+                "east_velocity": dec.VEL_E.values,  # [0, 3, 4, 6, -6, 6],
+                "north_velocity": dec.VEL_N.values,  # [0, 3, 6, 4, 4, -4],
+                "east_sigma": 2 * dec.RMSE_VEL_E.values,  # [4, 0, 4, 6, 6, 6],
+                "north_sigma": 2 * dec.RMSE_VEL_N.values,  # [6, 0, 6, 4, 4, 4],
+                "correlation_EN": np.zeros_like(dec.centroid_lon.values),  # [0.5, 0.5, 0.5, 0.5, -0.5, -0.5],
+                "SITE": dec.index.values,  # ["0x0", "3x3", "4x6", "6x4", "-6x4", "6x-4"],
+            }
+        )
+        #
+        # print('WARNING, exchanged ITRF to GPS velocities only')
+        df_sec = pd.DataFrame(
+            data={
+                "x": dec.centroid_lon.values,
+                "y": dec.centroid_lat.values,
+                "east_velocity": dec.sec_E,  # dec.ITRF_E.values, # [0, 3, 4, 6, -6, 6],
+                "north_velocity": dec.sec_N,  # dec.ITRF_N.values, # [0, 3, 6, 4, 4, -4],
+                "east_sigma": np.zeros_like(dec.centroid_lon.values),
+                "north_sigma": np.zeros_like(dec.centroid_lon.values),
+                "correlation_EN": np.zeros_like(dec.centroid_lon.values),  # [0.5, 0.5, 0.5, 0.5, -0.5, -0.5],
+                "SITE": dec.index.values,  # ["0x0", "3x3", "4x6", "6x4", "-6x4", "6x-4"],
+            }
+        )
     #
     df['east_velocity'] = df['east_velocity'] - median_diff_E
     df['north_velocity'] = df['north_velocity'] - median_diff_N
     x = dec.centroid_lon.values
     y = dec.centroid_lat.values
-    cpxEN = dec.sec_E.values + 1j * dec.sec_N.values
+    if plot_resids_only:
+        cpxEN = dec['resid_E'].values + 1j * dec['resid_N'].values
+    else:
+        cpxEN = dec.sec_E.values + 1j * dec.sec_N.values
     # cpxEN = dec['VEL_E'].values - median_diff + 1j*dec['VEL_N'].values
     #
     direction = np.degrees(np.angle(cpxEN))
@@ -1111,120 +1192,223 @@ def create_article_fig(deccsv = '/gws/ssde/j25a/nceo_geohazards/vol1/public/shar
     #
     fig = pygmt.Figure()
     pygmt.config(MAP_FRAME_TYPE="plain")
-    fig.coast(
-        region=region,
-        # region=[-180, 180, -50, 50],
-        projection="M0/0/30c",
-        # projection="T35/10c",
-        # frame=True,
-        # frame=["WSne", "2g2f"],
-        frame=["WNse", "5f", "a5f"],
-        # frame='a.5f.25WNse',
-        borders=False,
-        # borders=["1/0.2p,tomato,-"], # "2/0.5p,red", "3/0.5p,blue"],
-        # shorelines="0.01p,black",
-        area_thresh=4000,
-        land="lightgray",
-        water="lightblue1",
-    )
+    projection="M0/0/30c"
+
+    fig.basemap(region=region, projection=projection, frame=["WNse", "5f", "a5f"]) # frame=["af", f'+t{title}'])
+    if use_AHB:
+        cmap = "roma"
+        lims = [-40, 40]
+        pygmt.makecpt(cmap=cmap, series=lims, background=True, reverse=True)
+        #N_small = N.sel(
+        #    lon=slice(region[0], region[1]),
+        #    lat=slice(region[3], region[2]),
+        #)
+        #N_small = N_small.coarsen(lon=4, lat=4, boundary="trim").mean()
+
+        if os.path.exists('ahb.N.sm.tif'):
+            N_small = 'ahb.N.sm.tif'
+            import lics_processing as lp
+            ########## generate it
+            grid = lp.load_tif2xr(N_small)
+            grid = grid.load()
+            grid = grid.where(grid != 0)
+
+        fig.grdimage(grid=grid, cmap=True, projection=projection)
+
+        fig.coast(
+            region=region,
+            borders=False,
+            area_thresh=4000,
+            # land="lightgray",
+            water="lightgray",
+        )
+    else:
+        fig.coast(
+            region=region,
+            # region=[-180, 180, -50, 50],
+            #projection="M0/0/30c",
+            # projection="T35/10c",
+            # frame=True,
+            # frame=["WSne", "2g2f"],
+            #frame=["WNse", "5f", "a5f"],
+            # frame='a.5f.25WNse',
+            borders=False,
+            # borders=["1/0.2p,tomato,-"], # "2/0.5p,red", "3/0.5p,blue"],
+            # shorelines="0.01p,black",
+            area_thresh=4000,
+            land="lightgray",
+            water="lightblue1",
+        )
     # plot faults to the background
     fig.plot(data=faults, pen="0.15p,darkgray", label="faults")
     #fig.plot(data=euplate, pen="0.6p,black", label="Eurasia")
-    # first plot uncertainties (background)
-    fig.velo(
-        data=df_unc,
-        region=region,
-        pen="0.4p,blue",
-        uncertaintycolor="whitesmoke",
-        # label='uncertainty',
-        transparency=60,
-        line=True,
-        spec="e0.02/0.39/18",
-        # projection="x0.8c",
-        vector="0.25c+p1p+e+gblue",
-    )
-    #
-    fig.velo(
-        data=df_sec,
-        region=region,
-        pen="0.4p,red",
-        # label='ITRF2014',
-        # uncertaintycolor="lightblue1",
-        line=True,
-        spec="e0.02/0.39/18",
-        # projection="x0.8c",
-        vector="0.25c+e+gred",
-    )
-    #
-    # finally (blue) final velocities
-    fig.velo(
-        data=df,
-        region=region,
-        pen="0.4p,blue",
-        # uncertaintycolor="whitesmoke",
-        line=True,
-        # label='finalvel',
-        spec="e0.02/0.39/18",
-        # projection="x0.8c",
-        # vector="0.25c+p1.5p+e+gblue",
-        vector="0.25c+e+gblue",
-    )
+
+    if plot_chris:
+        gnss = '/gws/ssde/j25a/nceo_geohazards/vol1/projects/LiCS/proc/current/GIS/AHB_GPS/ahbgps_afterpaper_v6pt5/ahbgps_comparetopdf_2D_04-Apr-2026_eu.dat' #itrf14.dat'
+        gnss = pd.read_csv(gnss, delimiter=' ')
+        fig.plot(
+            x=gnss.lon,
+            y=gnss.lat,
+            style="c1.2p", # 0.15c",  # c = circle, 0.15 cm radius
+            fill="blue",
+            # pen="black",  # optional outline
+        )
+
+
+    if plot_resids_only:
+        fig.velo(
+            data=df_unc,
+            region=region,
+            pen="0.4p,black",
+            uncertainty_fill="whitesmoke",
+            # label='uncertainty',
+            transparency=60,
+            line=True,
+            spec="e0.02/0.39/18",
+            # projection="x0.8c",
+            vector="0.25c+p1p+e+gblack",
+        )
+        #
+        # finally velocities
+        fig.velo(
+            data=df,
+            region=region,
+            pen="0.4p,black",
+            # uncertaintycolor="whitesmoke",
+            line=True,
+            # label='finalvel',
+            spec="e0.02/0.39/18",
+            # projection="x0.8c",
+            # vector="0.25c+p1.5p+e+gblue",
+            vector="0.25c+e+gblack",
+        )
+    else:
+        # first plot uncertainties (background)
+        fig.velo(
+            data=df_unc,
+            region=region,
+            pen="0.4p,blue",
+            uncertainty_fill="whitesmoke",
+            # label='uncertainty',
+            transparency=60,
+            line=True,
+            spec="e0.02/0.39/18",
+            # projection="x0.8c",
+            vector="0.25c+p1p+e+gblue",
+        )
+        #
+        fig.velo(
+            data=df_sec,
+            region=region,
+            pen="0.4p,red",
+            # label='ITRF2014',
+            # uncertaintycolor="lightblue1",
+            line=True,
+            spec="e0.02/0.39/18",
+            # projection="x0.8c",
+            vector="0.25c+e+gred",
+        )
+        #
+        # finally (blue) final velocities
+        fig.velo(
+            data=df,
+            region=region,
+            pen="0.4p,blue",
+            # uncertaintycolor="whitesmoke",
+            line=True,
+            # label='finalvel',
+            spec="e0.02/0.39/18",
+            # projection="x0.8c",
+            # vector="0.25c+p1.5p+e+gblue",
+            vector="0.25c+e+gblue",
+        )
     #
     rectangle = [[region[0] + 1, region[2] + 1, region[0] + 16, region[2] + 7]]  # [[27, 35, 24, 30]] --> 27, 24, 35,30
-    fig.plot(data=rectangle, style="r+s", color='white')  # , transparency=10) ,#pen="2p,blue")
+    fig.plot(data=rectangle, style="r+s", fill='white')  # , transparency=10) ,#pen="2p,blue")
     # legend of final vel:
-    df_leg = pd.DataFrame(
-        data={
-            "x": [region[0] + 11],  # dec.centroid_lon.values,
-            "y": [region[2] + 6],  # dec.centroid_lat.values,
-            "east_velocity": [50],  # dec.ITRF_E.values, # [0, 3, 4, 6, -6, 6],
-            "north_velocity": [0],  # dec.ITRF_N.values, # [0, 3, 6, 4, 4, -4],
-            "east_sigma": [10],  # np.zeros_like(dec.centroid_lon.values),
-            "north_sigma": [10],  # np.zeros_like(dec.centroid_lon.values),
-            "correlation_EN": [0],  # np.zeros_like(dec.centroid_lon.values), # [0.5, 0.5, 0.5, 0.5, -0.5, -0.5],
-            "SITE": [0]  # dec.index.values, #["0x0", "3x3", "4x6", "6x4", "-6x4", "6x-4"],
-        }
-    )
-    fig.velo(
-        data=df_leg,
-        # region=region,
-        pen="0.4p,blue",
-        # uncertaintycolor="whitesmoke",
-        line=True,
-        # label='finalvel',
-        spec="e0.02/0.39/18",
-        # projection="x0.8c",
-        # vector="0.25c+p1.5p+e+gblue",
-        vector="0.25c+e+gblue",
-    )
+    if plot_resids_only:
+        df_leg = pd.DataFrame(
+            data={
+                "x": [region[0] + 11],  # dec.centroid_lon.values,
+                "y": [region[2] + 6],  # dec.centroid_lat.values,
+                "east_velocity": [10*scaling],  # dec.ITRF_E.values, # [0, 3, 4, 6, -6, 6],
+                "north_velocity": [-10*scaling],  # dec.ITRF_N.values, # [0, 3, 6, 4, 4, -4],
+                "east_sigma": [5*scaling],  # np.zeros_like(dec.centroid_lon.values),
+                "north_sigma": [5*scaling],  # np.zeros_like(dec.centroid_lon.values),
+                "correlation_EN": [0],  # np.zeros_like(dec.centroid_lon.values), # [0.5, 0.5, 0.5, 0.5, -0.5, -0.5],
+                "SITE": [0]  # dec.index.values, #["0x0", "3x3", "4x6", "6x4", "-6x4", "6x-4"],
+            }
+        )
+        fig.velo(
+            data=df_leg,
+            # region=region,
+            pen="0.4p,black",
+            # uncertaintycolor="whitesmoke",
+            line=True,
+            # label='finalvel',
+            spec="e0.02/0.39/18",
+            # projection="x0.8c",
+            # vector="0.25c+p1.5p+e+gblue",
+            vector="0.25c+e+gblack",
+        )
+    else:
+        df_leg = pd.DataFrame(
+            data={
+                "x": [region[0] + 11],  # dec.centroid_lon.values,
+                "y": [region[2] + 6],  # dec.centroid_lat.values,
+                "east_velocity": [10 * scaling],  # dec.ITRF_E.values, # [0, 3, 4, 6, -6, 6],
+                "north_velocity": [0],  # dec.ITRF_N.values, # [0, 3, 6, 4, 4, -4],
+                "east_sigma": [5 * scaling],  # np.zeros_like(dec.centroid_lon.values),
+                "north_sigma": [5 * scaling],  # np.zeros_like(dec.centroid_lon.values),
+                "correlation_EN": [0],  # np.zeros_like(dec.centroid_lon.values), # [0.5, 0.5, 0.5, 0.5, -0.5, -0.5],
+                "SITE": [0]  # dec.index.values, #["0x0", "3x3", "4x6", "6x4", "-6x4", "6x-4"],
+            }
+        )
+        fig.velo(
+            data=df_leg,
+            # region=region,
+            pen="0.4p,blue",
+            # uncertaintycolor="whitesmoke",
+            line=True,
+            # label='finalvel',
+            spec="e0.02/0.39/18",
+            # projection="x0.8c",
+            # vector="0.25c+p1.5p+e+gblue",
+            vector="0.25c+e+gblue",
+        )
+        #
+        df_leg = pd.DataFrame(
+            data={
+                "x": [region[0] + 11],  # dec.centroid_lon.values,
+                "y": [region[2] + 2],  # dec.centroid_lat.values,
+                "east_velocity": [10 * scaling], # let's show 2 cm/year scaled # dec.ITRF_E.values, # [0, 3, 4, 6, -6, 6],
+                "north_velocity": [0],  # dec.ITRF_N.values, # [0, 3, 6, 4, 4, -4],
+                "east_sigma": [0],  # np.zeros_like(dec.centroid_lon.values),
+                "north_sigma": [0],  # np.zeros_like(dec.centroid_lon.values),
+                "correlation_EN": [0],  # np.zeros_like(dec.centroid_lon.values), # [0.5, 0.5, 0.5, 0.5, -0.5, -0.5],
+                "SITE": [0]  # dec.index.values, #["0x0", "3x3", "4x6", "6x4", "-6x4", "6x-4"],
+            }
+        )
+        # then
+        fig.velo(
+            data=df_leg,
+            # region=region,
+            pen="0.4p,red",
+            # label='ITRF2014',
+            # uncertaintycolor="lightblue1",
+            line=True,
+            spec="e0.02/0.39/18",
+            # projection="x0.8c",
+            vector="0.25c+e+gred",
+        )
     #
-    df_leg = pd.DataFrame(
-        data={
-            "x": [region[0] + 11],  # dec.centroid_lon.values,
-            "y": [region[2] + 2],  # dec.centroid_lat.values,
-            "east_velocity": [50],  # dec.ITRF_E.values, # [0, 3, 4, 6, -6, 6],
-            "north_velocity": [0],  # dec.ITRF_N.values, # [0, 3, 6, 4, 4, -4],
-            "east_sigma": [0],  # np.zeros_like(dec.centroid_lon.values),
-            "north_sigma": [0],  # np.zeros_like(dec.centroid_lon.values),
-            "correlation_EN": [0],  # np.zeros_like(dec.centroid_lon.values), # [0.5, 0.5, 0.5, 0.5, -0.5, -0.5],
-            "SITE": [0]  # dec.index.values, #["0x0", "3x3", "4x6", "6x4", "-6x4", "6x-4"],
-        }
-    )
-    # then
-    fig.velo(
-        data=df_leg,
-        # region=region,
-        pen="0.4p,red",
-        # label='ITRF2014',
-        # uncertaintycolor="lightblue1",
-        line=True,
-        spec="e0.02/0.39/18",
-        # projection="x0.8c",
-        vector="0.25c+e+gred",
-    )
+    if use_AHB:
+        outpng = 'test.x.png'
+    else:
+        outpng = os.path.join(workdir, 'AHB.' + strTI + '.png')
     #
-    outpng = os.path.join(workdir, 'AHB.' + strTI + '.png')
     fig.savefig(outpng, dpi=dpi)
+    print(outpng)
     mean_diff_E = (dec['VEL_E'] - dec['sec_E']).mean()
     mean_diff_N = (dec['VEL_N'] - dec['sec_N']).mean()
     #
